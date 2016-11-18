@@ -58,7 +58,7 @@ import org.mariadb.jdbc.internal.util.dao.QueryException;
 
 import java.io.*;
 import java.nio.*;
-import java.sql.Timestamp;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.zip.DeflaterOutputStream;
@@ -85,6 +85,9 @@ public class PacketOutputStream extends OutputStream {
     int lastSeq;
     int maxAllowedPacket = MAX_PACKET_LENGTH;
     int maxPacketSize = MAX_PACKET_LENGTH;
+    //ensure to use maximum buffer of 64M, even if maxAllowedPacket is bigger
+    int maxPacketSizeLimited = MAX_PACKET_LENGTH;
+
     boolean checkPacketLength;
     boolean useCompression;
     boolean logQuery;
@@ -467,14 +470,14 @@ public class PacketOutputStream extends OutputStream {
 
     /**
      * Check that current buffer + length will not be superior to max_allowed_packet + header size.
-     * That permit to separate rewritable queries to be separate in multiple stream.
-     * @param length additionnal length
+     * That permit to separate queries to be separate in multiple stream.
+     * @param length additional length
      * @return true if with this additional length stream can be send in the same stream
      */
-    public boolean checkRewritableLength(int length) {
+    public boolean belowMaxAllowedPacket(int length) {
         return !(checkPacketLength
-                && ((!useCompression && buffer.position() + length >= maxAllowedPacket)
-                || (useCompression && buffer.position() + length + 4 >= maxAllowedPacket)));
+                && ((!useCompression && buffer.position() + length >= maxPacketSizeLimited)
+                || (useCompression && buffer.position() + length + 4 >= maxPacketSizeLimited)));
     }
 
     private void checkPacketMaxSize(int limit) throws MaxAllowedPacketException {
@@ -656,6 +659,7 @@ public class PacketOutputStream extends OutputStream {
         this.maxAllowedPacket = maxAllowedPacket;
         if (maxAllowedPacket > 0) {
             maxPacketSize = Math.min(maxAllowedPacket, MAX_PACKET_LENGTH);
+            maxPacketSizeLimited = Math.min(maxPacketSize, 4 * MAX_PACKET_LENGTH);
         } else {
             maxPacketSize = MAX_PACKET_LENGTH;
         }
@@ -770,6 +774,30 @@ public class PacketOutputStream extends OutputStream {
         return this;
     }
 
+
+    /**
+     * Write field length to encode in binary format.
+     * @param length data length to encode
+     * @return this.
+     */
+    public PacketOutputStream writeFieldLengthUnsafe(long length) {
+        if (length < 251) {
+            buffer.put((byte) length);
+        } else if (length < 65536) {
+            buffer.put((byte) 0xfc);
+            buffer.putShort((short) length);
+        } else if (length < 16777216) {
+            buffer.put((byte) 0xfd);
+            buffer.put((byte) (length & 0xff));
+            buffer.put((byte) (length >>> 8));
+            buffer.put((byte) (length >>> 16));
+        } else {
+            buffer.put((byte) 0xfe);
+            buffer.putLong(length);
+        }
+        return this;
+    }
+
     /**
      * Write field length to encode in binary format.
      * @param length data length to encode
@@ -802,36 +830,10 @@ public class PacketOutputStream extends OutputStream {
      * @return this.
      */
     public PacketOutputStream writeStringLength(final String str) {
-        try {
-            final byte[] strBytes = str.getBytes("UTF-8");
-            assureBufferCapacity(strBytes.length + 9);
-            writeFieldLength(strBytes.length);
-            buffer.put(strBytes);
-        } catch (UnsupportedEncodingException u) {
-        }
-        return this;
-    }
-
-    /**
-     * Write timestamp in binary format.
-     * @param calendar session calendar
-     * @param ts timestamp to send
-     * @param fractionalSeconds must fractionnal second be send to server
-     * @return this
-     */
-    public PacketOutputStream writeTimestampLength(final Calendar calendar, Timestamp ts, boolean fractionalSeconds) {
-        assureBufferCapacity(fractionalSeconds ? 12 : 8);
-        buffer.put((byte) (fractionalSeconds ? 11 : 7));//length
-
-        buffer.putShort((short) calendar.get(Calendar.YEAR));
-        buffer.put((byte) ((calendar.get(Calendar.MONTH) + 1) & 0xff));
-        buffer.put((byte) (calendar.get(Calendar.DAY_OF_MONTH) & 0xff));
-        buffer.put((byte) calendar.get(Calendar.HOUR_OF_DAY));
-        buffer.put((byte) calendar.get(Calendar.MINUTE));
-        buffer.put((byte) calendar.get(Calendar.SECOND));
-        if (fractionalSeconds) {
-            buffer.putInt(ts.getNanos() / 1000);
-        }
+        final byte[] strBytes = str.getBytes(StandardCharsets.UTF_8);
+        assureBufferCapacity(strBytes.length + 9);
+        writeFieldLength(strBytes.length);
+        buffer.put(strBytes);
         return this;
     }
 
@@ -849,34 +851,6 @@ public class PacketOutputStream extends OutputStream {
         buffer.put((byte) 0);
         buffer.put((byte) 0);
         buffer.put((byte) 0);
-        return this;
-    }
-
-    /**
-     * Write time in binary format.
-     * @param calendar session calendar.
-     * @param fractionalSeconds fractional seconds must be send
-     * @return this
-     */
-    public PacketOutputStream writeTimeLength(final Calendar calendar, final boolean fractionalSeconds) {
-        if (fractionalSeconds) {
-            assureBufferCapacity(13);
-            buffer.put((byte) 12);
-            buffer.put((byte) 0);
-            buffer.putInt(0);
-            buffer.put((byte) calendar.get(Calendar.HOUR_OF_DAY));
-            buffer.put((byte) calendar.get(Calendar.MINUTE));
-            buffer.put((byte) calendar.get(Calendar.SECOND));
-            buffer.putInt(calendar.get(Calendar.MILLISECOND) * 1000);
-        } else {
-            assureBufferCapacity(9);
-            buffer.put((byte) 8);//length
-            buffer.put((byte) 0);
-            buffer.putInt(0);
-            buffer.put((byte) calendar.get(Calendar.HOUR_OF_DAY));
-            buffer.put((byte) calendar.get(Calendar.MINUTE));
-            buffer.put((byte) calendar.get(Calendar.SECOND));
-        }
         return this;
     }
 

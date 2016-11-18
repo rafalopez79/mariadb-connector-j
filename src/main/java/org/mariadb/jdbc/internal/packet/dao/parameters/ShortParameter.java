@@ -65,12 +65,24 @@ public class ShortParameter implements ParameterHolder, Cloneable {
         os.write(String.valueOf(value).getBytes());
     }
 
+    /**
+     * Write in binary format without checking buffer size.
+     * @param os buffer to write
+     */
     public void writeUnsafeTo(final PacketOutputStream os) {
         os.writeUnsafe(String.valueOf(value).getBytes());
     }
 
     public long getApproximateTextProtocolLength() throws IOException {
         return String.valueOf(value).getBytes().length;
+    }
+
+    public long getApproximateBinaryProtocolLength() {
+        return 2;
+    }
+
+    public void writeUnsafeBinary(PacketOutputStream writeBuffer) {
+        writeBuffer.buffer.putShort(value);
     }
 
     public void writeBinary(final PacketOutputStream writeBuffer) {

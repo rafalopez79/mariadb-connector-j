@@ -51,9 +51,7 @@ OF SUCH DAMAGE.
 import org.mariadb.jdbc.internal.MariaDbType;
 import org.mariadb.jdbc.internal.stream.PacketOutputStream;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 
@@ -76,7 +74,21 @@ public class ByteArrayParameter implements ParameterHolder, Cloneable {
     }
 
     public long getApproximateTextProtocolLength() {
-        return bytes.length * 2;
+        //using text, bytes may be escaped + header '_binary \'' + '\'' footer
+        return bytes.length * 2 + 10;
+    }
+
+    public long getApproximateBinaryProtocolLength() {
+        return bytes.length + 9;
+    }
+
+    /**
+     * Write in binary format without checking buffer size.
+     * @param writeBuffer buffer to write
+     */
+    public void writeUnsafeBinary(PacketOutputStream writeBuffer) {
+        writeBuffer.writeFieldLengthUnsafe(bytes.length);
+        writeBuffer.buffer.put(bytes);
     }
 
     public void writeBinary(final PacketOutputStream writeBuffer) {

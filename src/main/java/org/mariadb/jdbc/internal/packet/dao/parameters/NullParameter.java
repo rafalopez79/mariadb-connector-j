@@ -80,6 +80,18 @@ public class NullParameter implements ParameterHolder, Cloneable {
         return 4;
     }
 
+    public long getApproximateBinaryProtocolLength() {
+        return 0;
+    }
+
+    /**
+     * Write in binary format without checking buffer size.
+     * @param writeBuffer buffer to write
+     */
+    public void writeUnsafeBinary(PacketOutputStream writeBuffer) {
+        //null data are not send in binary format.
+    }
+
     public void writeBinary(final PacketOutputStream writeBuffer) {
         //null data are not send in binary format.
     }

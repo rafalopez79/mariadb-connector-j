@@ -3131,6 +3131,14 @@ public class MariaSelectResultSet implements ResultSet {
                     }
                     return doubleValue.shortValue();
                 case BIT:
+                    long bitResult = 0;
+                    int bitLength = rawBytes.length;
+
+                    for (int pos = 0; pos < bitLength; pos++) {
+                        bitResult += (rawBytes[bitLength - (pos + 1)] & 0xff)  <<  (8 * pos);
+                    }
+                    rangeCheck(Short.class, Short.MIN_VALUE, Short.MAX_VALUE, bitResult, columnInfo);
+                    return (short) bitResult;
                 case TINYINT:
                 case SMALLINT:
                 case YEAR:
@@ -3191,6 +3199,14 @@ public class MariaSelectResultSet implements ResultSet {
                     }
                     return doubleValue.intValue();
                 case BIT:
+                    long bitResult = 0;
+                    int bitLength = rawBytes.length;
+
+                    for (int pos = 0; pos < bitLength; pos++) {
+                        bitResult += (rawBytes[bitLength - (pos + 1)] & 0xff)  <<  (8 * pos);
+                    }
+                    rangeCheck(Integer.class, Integer.MIN_VALUE, Integer.MAX_VALUE, bitResult, columnInfo);
+                    return (int) bitResult;
                 case TINYINT:
                 case SMALLINT:
                 case YEAR:
@@ -3257,6 +3273,14 @@ public class MariaSelectResultSet implements ResultSet {
                     }
                     return doubleValue.longValue();
                 case BIT:
+                    long bitResult = 0;
+                    int bitLength = rawBytes.length;
+
+                    for (int pos = 0; pos < bitLength; pos++) {
+                        bitResult += (rawBytes[bitLength - (pos + 1)] & 0xff)  <<  (8 * pos);
+                    }
+
+                    return bitResult;
                 case TINYINT:
                 case SMALLINT:
                 case YEAR:

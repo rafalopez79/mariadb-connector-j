@@ -101,6 +101,14 @@ public class MultiFixedIntExecutionResult implements MultiExecutionResult {
     }
 
     /**
+     * force result insert ids to unknown.
+     */
+    public void fixStatsUnknown() {
+        Arrays.fill(affectedRows, Statement.SUCCESS_NO_INFO);
+    }
+
+
+    /**
      * Set resultSet for rewrite queries.
      *
      * INSERT INTO XX VALUES (YYY)

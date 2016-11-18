@@ -72,6 +72,18 @@ public class LongParameter implements ParameterHolder, Cloneable {
         return String.valueOf(value).getBytes().length;
     }
 
+    public long getApproximateBinaryProtocolLength() {
+        return 8;
+    }
+
+    /**
+     * Write in binary format without checking buffer size.
+     * @param writeBuffer buffer to write
+     */
+    public void writeUnsafeBinary(PacketOutputStream writeBuffer) {
+        writeBuffer.buffer.putLong(value);
+    }
+
     public void writeBinary(final PacketOutputStream writeBuffer) {
         writeBuffer.writeLong(value);
     }

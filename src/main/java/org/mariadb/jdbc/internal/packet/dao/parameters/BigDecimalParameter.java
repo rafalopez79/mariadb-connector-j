@@ -52,6 +52,7 @@ import org.mariadb.jdbc.internal.MariaDbType;
 import org.mariadb.jdbc.internal.stream.PacketOutputStream;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 
 public class BigDecimalParameter implements ParameterHolder, Cloneable {
     private BigDecimal bigDecimal;
@@ -70,6 +71,21 @@ public class BigDecimalParameter implements ParameterHolder, Cloneable {
 
     public long getApproximateTextProtocolLength() {
         return bigDecimal.toPlainString().getBytes().length;
+    }
+
+    public long getApproximateBinaryProtocolLength() {
+        return bigDecimal.toPlainString().getBytes().length + 9;
+    }
+
+    /**
+     * Write in binary format without checking buffer size.
+     * @param writeBuffer buffer to write
+     */
+    public void writeUnsafeBinary(PacketOutputStream writeBuffer) {
+        String str = bigDecimal.toPlainString();
+        final byte[] strBytes = str.getBytes(StandardCharsets.UTF_8);
+        writeBuffer.writeFieldLengthUnsafe(strBytes.length);
+        writeBuffer.buffer.put(strBytes);
     }
 
     public void writeBinary(PacketOutputStream writeBuffer) {

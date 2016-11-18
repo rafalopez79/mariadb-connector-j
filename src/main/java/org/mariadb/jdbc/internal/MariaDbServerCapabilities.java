@@ -77,5 +77,6 @@ public class MariaDbServerCapabilities {
     /* MariaDB specific capabilities */
     public static final long MARIADB_CLIENT_PROGRESS = 1L << 32; /* Client support progress indicator (since 10.2) */
     public static final long MARIADB_CLIENT_COM_MULTI = 1L << 33;
+    public static final long MARIADB_CLIENT_STMT_BULK_OPERATIONS = 1L << 34; /* support of array binding */
 
 }

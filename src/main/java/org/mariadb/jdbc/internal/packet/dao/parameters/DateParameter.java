@@ -116,6 +116,25 @@ public class DateParameter implements ParameterHolder, Cloneable {
         return 16;
     }
 
+    public long getApproximateBinaryProtocolLength() {
+        return 8;
+    }
+
+    /**
+     * Write in binary format without checking buffer size.
+     * @param writeBuffer buffer to write
+     */
+    public void writeUnsafeBinary(PacketOutputStream writeBuffer) {
+        calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(date.getTime());
+        writeBuffer.buffer.put((byte) 7);//length
+        writeBuffer.buffer.putShort((short) calendar.get(Calendar.YEAR));
+        writeBuffer.buffer.put((byte) ((calendar.get(Calendar.MONTH) + 1) & 0xff));
+        writeBuffer.buffer.put((byte) (calendar.get(Calendar.DAY_OF_MONTH) & 0xff));
+        writeBuffer.buffer.put((byte) 0);
+        writeBuffer.buffer.put((byte) 0);
+        writeBuffer.buffer.put((byte) 0);
+    }
 
     /**
      * Write to server OutputStream in binary protocol.

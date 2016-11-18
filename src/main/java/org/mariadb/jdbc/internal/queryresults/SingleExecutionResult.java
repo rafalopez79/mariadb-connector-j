@@ -146,6 +146,10 @@ public class SingleExecutionResult implements ExecutionResult {
 
     public void fixStatsError(int sendCommand) { }
 
+    public void fixStatsUnknown() {
+        //no need for single Execution;
+    }
+
     public MariaSelectResultSet getResultSet() {
         return result;
     }

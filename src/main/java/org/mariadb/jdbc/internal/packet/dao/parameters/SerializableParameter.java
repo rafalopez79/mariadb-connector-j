@@ -107,6 +107,18 @@ public class SerializableParameter implements ParameterHolder {
     }
 
 
+    public long getApproximateBinaryProtocolLength() {
+        return -1;
+    }
+
+    /**
+     * Write in binary format without checking buffer size.
+     * @param os buffer to write
+     */
+    public void writeUnsafeBinary(PacketOutputStream os) throws IOException {
+        writeBinary(os);
+    }
+
     /**
      * Write data in binary format to buffer.
      * @param os buffer

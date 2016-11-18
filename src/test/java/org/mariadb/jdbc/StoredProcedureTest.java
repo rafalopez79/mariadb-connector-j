@@ -214,6 +214,26 @@ public class StoredProcedureTest extends BaseTest {
     }
 
     @Test
+    public void prepareBatchMultiResultSetsBulk() throws Exception {
+        PreparedStatement stmt = sharedConnection.prepareStatement("{call multiResultSets()}", Statement.NO_GENERATED_KEYS);
+        stmt.addBatch();
+        stmt.addBatch();
+        try {
+            stmt.executeBatch();
+        } catch (SQLException e) {
+            if (e.getMessage().contains("This command is not supported in the prepared statement protocol yet")) {
+                //ok normal error using bulk loading with 10.2 server
+            } else {
+                assertTrue(e.getMessage().contains("Select command are not permitted via executeBatch() command"));
+            }
+        }
+        executeAnotherRequest();
+    }
+
+
+
+
+    @Test
     public void stmtMultiResultSets() throws Exception {
         Statement stmt = sharedConnection.createStatement();
         stmt.execute("{call multiResultSets()}");

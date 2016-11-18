@@ -79,7 +79,7 @@ public abstract class AbstractCallableFunctionStatement extends MariaDbClientPre
      * @throws SQLException if clientPrepareStatement creation throw an exception
      */
     public AbstractCallableFunctionStatement(MariaDbConnection connection, String sql, int resultSetScrollType) throws SQLException {
-        super(connection, sql, resultSetScrollType);
+        super(connection, sql, resultSetScrollType, Statement.RETURN_GENERATED_KEYS);
     }
 
     /**

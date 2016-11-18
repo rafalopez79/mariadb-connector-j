@@ -61,15 +61,28 @@ public class ByteParameter implements ParameterHolder, Cloneable {
     }
 
     public void writeTo(final PacketOutputStream os) {
-        os.write(String.valueOf(value).getBytes());
+        os.assureBufferCapacity(3);
+        os.buffer.put(String.valueOf(value).getBytes());
     }
 
     public void writeUnsafeTo(final PacketOutputStream os) {
-        os.writeUnsafe(String.valueOf(value).getBytes());
+        os.buffer.put(String.valueOf(value).getBytes());
     }
 
     public long getApproximateTextProtocolLength() {
-        return String.valueOf(value).getBytes().length * 2;
+        return 3; //max '255'
+    }
+
+    public long getApproximateBinaryProtocolLength() {
+        return 1;
+    }
+
+    /**
+     * Write in binary format without checking buffer size.
+     * @param writeBuffer buffer to write
+     */
+    public void writeUnsafeBinary(PacketOutputStream writeBuffer) {
+        writeBuffer.buffer.put(value);
     }
 
     public void writeBinary(final PacketOutputStream writeBuffer) {

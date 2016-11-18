@@ -912,4 +912,161 @@ public class ServerPrepareStatementTest extends BaseTest {
         }
     }
 
+    @Test
+    public void testPacketSplit1() throws  SQLException {
+        try (Connection connection = setConnection()) {
+            createTable("ServerPrepareStatementTestType", "bit1 BIT(1), bit2 BIT(10)");
+            PreparedStatement ps = connection.prepareStatement("INSERT INTO ServerPrepareStatementTestType (bit1,bit2) VALUES (?,?)",
+                    Statement.NO_GENERATED_KEYS);
+
+            ps.setByte(1, (byte) 0);
+            ps.setShort(2, (short) 512);
+            ps.addBatch();
+
+            ps.setByte(1, (byte) 0);
+            ps.setShort(2, (short) 513);
+            ps.addBatch();
+
+            ps.setByte(1, (byte) 1);
+            ps.setInt(2, (byte) 2);
+            ps.addBatch();
+
+            ps.setByte(1, (byte) 0);
+            ps.setShort(2, (short) 514);
+            ps.addBatch();
+
+            ps.executeBatch();
+
+            ResultSet rs = sharedConnection.createStatement().executeQuery("SELECT * FROM ServerPrepareStatementTestType");
+            Assert.assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1));
+            assertEquals(512, rs.getInt(2));
+
+
+            Assert.assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1));
+            assertEquals(513, rs.getInt(2));
+
+            Assert.assertTrue(rs.next());
+            assertEquals(1, rs.getInt(1));
+            assertEquals(2, rs.getInt(2));
+
+            Assert.assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1));
+            assertEquals(514, rs.getInt(2));
+
+            Assert.assertFalse(rs.next());
+        }
+    }
+
+    @Test
+    public void testPacketSplit2() throws  SQLException {
+        try (Connection connection = setConnection()) {
+            createTable("ServerPrepareStatementTestType2", "bit1 BIT(7), bit2 BIT(10)");
+            PreparedStatement ps = connection.prepareStatement("INSERT INTO ServerPrepareStatementTestType2 (bit1,bit2) VALUES (?,?)",
+                    Statement.NO_GENERATED_KEYS);
+
+            ps.setByte(1, (byte) 0);
+            ps.setShort(2, (short) 512);
+            ps.addBatch();
+
+            ps.setByte(1, (byte) 127);
+            ps.setShort(2, (short) 513);
+            ps.addBatch();
+
+            ps.setByte(1, (byte) 1);
+            ps.setInt(2, (byte) 2);
+            ps.addBatch();
+
+            ps.setByte(1, (byte) 0);
+            ps.setShort(2, (short) 514);
+            ps.addBatch();
+
+            ps.setByte(1, (byte) 0);
+            ps.setShort(2, (short) 515);
+            ps.addBatch();
+
+            ps.executeBatch();
+
+            ResultSet rs = sharedConnection.createStatement().executeQuery("SELECT * FROM ServerPrepareStatementTestType2");
+            Assert.assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1));
+            assertEquals(512, rs.getInt(2));
+
+
+            Assert.assertTrue(rs.next());
+            assertEquals(127, rs.getInt(1));
+            assertEquals(127, rs.getByte(1));
+            assertEquals(127, rs.getShort(1));
+            assertEquals(127, rs.getLong(1));
+            assertEquals(513, rs.getInt(2));
+            assertEquals(513, rs.getShort(2));
+            assertEquals(513, rs.getLong(2));
+
+            Assert.assertTrue(rs.next());
+            assertEquals(1, rs.getInt(1));
+            assertEquals(2, rs.getInt(2));
+
+            Assert.assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1));
+            assertEquals(514, rs.getInt(2));
+
+
+            Assert.assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1));
+            assertEquals(515, rs.getInt(2));
+
+            Assert.assertFalse(rs.next());
+        }
+    }
+
+    @Test
+    public void testVeryBigData() throws  SQLException {
+        executionVeryBigData(30);
+    }
+
+    @Test
+    public void testVeryBigDataMustFail() throws  SQLException {
+        try {
+            executionVeryBigData(0);
+            fail("Must have thrown error, because unit case > max_allowed_packet");
+        } catch (SQLException e) {
+            Assert.assertTrue(e.getMessage().contains("is >= to max_allowed_packet"));
+        }
+    }
+
+
+    private void executionVeryBigData(int minus) throws  SQLException {
+        ResultSet rs1 = sharedConnection.createStatement().executeQuery("SELECT @@max_allowed_packet");
+        rs1.next();
+        int maxAllowed = rs1.getInt(1);
+        int dataSize = (maxAllowed) / 2  - minus;
+        createTable("ServerPrepareStatementTestType3", "data1 text(" + dataSize + "), data2 text(" + dataSize + ")");
+        try (Connection connection = setConnection()) {
+
+            char[] arr = new char[dataSize];
+            for (int i = 0; i < arr.length; i++) {
+                arr[i] = (char) ('a' + (i % 10));
+            }
+            String val = new String(arr);
+            PreparedStatement ps = connection.prepareStatement("INSERT INTO ServerPrepareStatementTestType3 (data1,data2) VALUES (?,?)",
+                    Statement.NO_GENERATED_KEYS);
+
+            for (int i = 0; i < 10; i++) {
+                ps.setString(1, val);
+                ps.setString(2, val);
+                ps.addBatch();
+            }
+            ps.executeBatch();
+
+            ResultSet rs = connection.createStatement().executeQuery("SELECT * FROM ServerPrepareStatementTestType3");
+
+            for (int i = 0; i < 10; i++) {
+                Assert.assertTrue(rs.next());
+                assertEquals(val, rs.getString(1));
+                assertEquals(val, rs.getString(2));
+            }
+            Assert.assertFalse(rs.next());
+        }
+    }
 }

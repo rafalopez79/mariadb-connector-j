@@ -132,6 +132,7 @@ public abstract class AbstractConnectProtocol implements Protocol {
     public MariaSelectResultSet activeStreamingResult = null;
     public int dataTypeMappingFlags;
     public short serverStatus;
+    protected boolean supportArrayBinding;
 
     /**
      * Get a protocol instance.
@@ -472,6 +473,7 @@ public abstract class AbstractConnectProtocol implements Protocol {
             final ReadInitialConnectPacket greetingPacket = new ReadInitialConnectPacket(packetFetcher);
             this.serverThreadId = greetingPacket.getServerThreadId();
             this.version = greetingPacket.getServerVersion();
+            supportArrayBinding = (greetingPacket.getServerCapabilities() & MariaDbServerCapabilities.MARIADB_CLIENT_STMT_BULK_OPERATIONS) != 0;
             this.checkCallableResultSet = this.version.indexOf("MariaDB") == -1;
 
             byte exchangeCharset = decideLanguage(greetingPacket.getServerLanguage());
@@ -584,7 +586,8 @@ public abstract class AbstractConnectProtocol implements Protocol {
                         | MariaDbServerCapabilities.PLUGIN_AUTH
                         | MariaDbServerCapabilities.CONNECT_ATTRS
                         | MariaDbServerCapabilities.PLUGIN_AUTH_LENENC_CLIENT_DATA
-                        | MariaDbServerCapabilities.MARIADB_CLIENT_COM_MULTI;
+                        | MariaDbServerCapabilities.MARIADB_CLIENT_COM_MULTI
+                        | MariaDbServerCapabilities.MARIADB_CLIENT_STMT_BULK_OPERATIONS;
 
         if (options.allowMultiQueries || (options.rewriteBatchedStatements)) {
             capabilities |= MariaDbServerCapabilities.MULTI_STATEMENTS;
@@ -1082,6 +1085,10 @@ public abstract class AbstractConnectProtocol implements Protocol {
 
     public void changeSocketSoTimeout(int setSoTimeout) throws SocketException {
         socket.setSoTimeout(setSoTimeout);
+    }
+
+    public boolean isSupportArrayBinding() {
+        return supportArrayBinding;
     }
 
 }

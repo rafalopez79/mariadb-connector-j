@@ -73,14 +73,14 @@ public class MariaDbPrepareStatementFacade implements PreparedStatement {
      */
     public MariaDbPrepareStatementFacade(final String sql, final int resultSetScrollType,
                                                            MariaDbConnection connection) throws SQLException {
-        preparedStatement = new MariaDbServerPreparedStatement(connection, sql, resultSetScrollType, false);
+        preparedStatement = new MariaDbServerPreparedStatement(connection, sql, resultSetScrollType, false, Statement.RETURN_GENERATED_KEYS);
     }
 
     private void clientFailover() throws SQLException {
         MariaDbServerPreparedStatement currentPrepStmt = ((MariaDbServerPreparedStatement) preparedStatement);
         MariaDbClientPreparedStatement newPrepStmt = new MariaDbClientPreparedStatement(
                 (MariaDbConnection) currentPrepStmt.getConnection(),
-                currentPrepStmt.sql, currentPrepStmt.resultSetScrollType);
+                currentPrepStmt.sql, currentPrepStmt.resultSetScrollType, Statement.RETURN_GENERATED_KEYS);
         newPrepStmt.initializeFallbackClient(currentPrepStmt);
 
         this.isPrepared = false;

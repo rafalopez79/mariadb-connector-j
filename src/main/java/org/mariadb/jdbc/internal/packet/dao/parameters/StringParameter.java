@@ -97,6 +97,22 @@ public class StringParameter implements ParameterHolder, Cloneable {
         return position;
     }
 
+
+    public long getApproximateBinaryProtocolLength() {
+        if (escapedArray == null) utf8();
+        return position + 9;
+    }
+
+    /**
+     * Write in binary format without checking buffer size.
+     * @param writer buffer to write
+     */
+    public void writeUnsafeBinary(PacketOutputStream writer) {
+        writer.writeFieldLengthUnsafe(position);
+        writer.buffer.put(escapedArray, 0, position);
+        escapedArray = null; //in case ServerPrepareStmt fallback to clientPrepareStmt (need escape)
+    }
+
     /**
      * Send string value to server in binary format.
      *

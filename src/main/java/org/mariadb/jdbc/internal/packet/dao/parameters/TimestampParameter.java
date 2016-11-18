@@ -117,14 +117,37 @@ public class TimestampParameter implements ParameterHolder, Cloneable {
     public long getApproximateTextProtocolLength() throws IOException {
         return 27;
     }
+
+    public long getApproximateBinaryProtocolLength() {
+        return 12;
+    }
+
+    /**
+     * Write timeStamp in binary format without checking buffer size.
+     * @param writeBuffer buffer to write
+     */
+    public void writeUnsafeBinary(PacketOutputStream writeBuffer) {
+        if (options.useLegacyDatetimeCode) calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(ts.getTime());
+        writeBuffer.buffer.put((byte) (fractionalSeconds ? 11 : 7));//length
+        writeBuffer.buffer.putShort((short) calendar.get(Calendar.YEAR));
+        writeBuffer.buffer.put((byte) ((calendar.get(Calendar.MONTH) + 1) & 0xff));
+        writeBuffer.buffer.put((byte) (calendar.get(Calendar.DAY_OF_MONTH) & 0xff));
+        writeBuffer.buffer.put((byte) calendar.get(Calendar.HOUR_OF_DAY));
+        writeBuffer.buffer.put((byte) calendar.get(Calendar.MINUTE));
+        writeBuffer.buffer.put((byte) calendar.get(Calendar.SECOND));
+        if (fractionalSeconds) {
+            writeBuffer.buffer.putInt(ts.getNanos() / 1000);
+        }
+    }
+
     /**
      * Write timeStamp in binary format.
      * @param writeBuffer buffer to write
      */
     public void writeBinary(final PacketOutputStream writeBuffer) {
-        if (options.useLegacyDatetimeCode) calendar = Calendar.getInstance();
-        calendar.setTimeInMillis(ts.getTime());
-        writeBuffer.writeTimestampLength(calendar, ts, fractionalSeconds);
+        writeBuffer.assureBufferCapacity(fractionalSeconds ? 12 : 8);
+        writeUnsafeBinary(writeBuffer);
     }
 
     public MariaDbType getMariaDbType() {

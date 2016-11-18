@@ -118,6 +118,18 @@ public class ReaderParameter implements ParameterHolder {
         return -1;
     }
 
+    /**
+     * Write in binary format without checking buffer size.
+     * @param os buffer to write
+     * @throws IOException if any error occur when reading reader
+     */
+    public void writeUnsafeBinary(PacketOutputStream os) throws IOException {
+        writeBinary(os);
+    }
+
+    public long getApproximateBinaryProtocolLength() {
+        return -1;
+    }
 
     /**
      * Write reader to database in binary format.

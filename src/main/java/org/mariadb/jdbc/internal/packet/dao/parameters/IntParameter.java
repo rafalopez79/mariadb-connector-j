@@ -71,6 +71,18 @@ public class IntParameter implements ParameterHolder, Cloneable {
         return String.valueOf(value).getBytes().length;
     }
 
+    public long getApproximateBinaryProtocolLength() {
+        return 4;
+    }
+
+    /**
+     * Write in binary format without checking buffer size.
+     * @param writeBuffer buffer to write
+     */
+    public void writeUnsafeBinary(PacketOutputStream writeBuffer) {
+        writeBuffer.buffer.putInt(value);
+    }
+
     public void writeBinary(final PacketOutputStream writeBuffer) {
         writeBuffer.assureBufferCapacity(4);
         writeBuffer.buffer.putInt(value);

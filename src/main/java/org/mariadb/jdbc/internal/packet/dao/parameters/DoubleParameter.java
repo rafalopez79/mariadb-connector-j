@@ -53,6 +53,8 @@ OF SUCH DAMAGE.
 import org.mariadb.jdbc.internal.stream.PacketOutputStream;
 import org.mariadb.jdbc.internal.MariaDbType;
 
+import java.util.Calendar;
+
 public class DoubleParameter implements ParameterHolder, Cloneable {
     private double value;
 
@@ -72,6 +74,17 @@ public class DoubleParameter implements ParameterHolder, Cloneable {
         return String.valueOf(value).getBytes().length;
     }
 
+    public long getApproximateBinaryProtocolLength() {
+        return 8;
+    }
+
+    /**
+     * Write in binary format without checking buffer size.
+     * @param writeBuffer buffer to write
+     */
+    public void writeUnsafeBinary(PacketOutputStream writeBuffer) {
+        writeBuffer.buffer.putLong(Double.doubleToLongBits(value));
+    }
 
     public void writeBinary(final PacketOutputStream writeBuffer) {
         writeBuffer.writeLong(Double.doubleToLongBits(value));

@@ -36,6 +36,9 @@ public interface ExecutionResult {
 
     long[] getInsertIds();
 
+
+    void fixStatsUnknown();
+
     boolean hasMoreThanOneAffectedRows();
 
     int getFirstAffectedRows();

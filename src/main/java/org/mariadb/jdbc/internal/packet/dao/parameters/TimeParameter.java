@@ -114,15 +114,63 @@ public class TimeParameter implements ParameterHolder, Cloneable {
         return 15;
     }
 
+    public long getApproximateBinaryProtocolLength() {
+        return 13;
+    }
+
     /**
-     * Write time in binary format.
-     * @param writeBuffer write buffer
+     * Write in binary format without checking buffer size.
+     * @param pos buffer to write
      */
-    public void writeBinary(final PacketOutputStream writeBuffer) {
+    public void writeUnsafeBinary(PacketOutputStream pos) {
         calendar = Calendar.getInstance();
         calendar.setTime(time);
         calendar.set(Calendar.DAY_OF_MONTH, 1);
-        writeBuffer.writeTimeLength(calendar, fractionalSeconds);
+
+        if (fractionalSeconds) {
+            pos.buffer.put((byte) 12);
+            pos.buffer.put((byte) 0);
+            pos.buffer.putInt(0);
+            pos.buffer.put((byte) calendar.get(Calendar.HOUR_OF_DAY));
+            pos.buffer.put((byte) calendar.get(Calendar.MINUTE));
+            pos.buffer.put((byte) calendar.get(Calendar.SECOND));
+            pos.buffer.putInt(calendar.get(Calendar.MILLISECOND) * 1000);
+        } else {
+            pos.buffer.put((byte) 8);//length
+            pos.buffer.put((byte) 0);
+            pos.buffer.putInt(0);
+            pos.buffer.put((byte) calendar.get(Calendar.HOUR_OF_DAY));
+            pos.buffer.put((byte) calendar.get(Calendar.MINUTE));
+            pos.buffer.put((byte) calendar.get(Calendar.SECOND));
+        }
+    }
+
+    /**
+     * Write time in binary format.
+     * @param pos write buffer
+     */
+    public void writeBinary(final PacketOutputStream pos) {
+        calendar = Calendar.getInstance();
+        calendar.setTime(time);
+        calendar.set(Calendar.DAY_OF_MONTH, 1);
+        if (fractionalSeconds) {
+            pos.assureBufferCapacity(13);
+            pos.buffer.put((byte) 12);
+            pos.buffer.put((byte) 0);
+            pos.buffer.putInt(0);
+            pos.buffer.put((byte) calendar.get(Calendar.HOUR_OF_DAY));
+            pos.buffer.put((byte) calendar.get(Calendar.MINUTE));
+            pos.buffer.put((byte) calendar.get(Calendar.SECOND));
+            pos.buffer.putInt(calendar.get(Calendar.MILLISECOND) * 1000);
+        } else {
+            pos.assureBufferCapacity(9);
+            pos.buffer.put((byte) 8);//length
+            pos.buffer.put((byte) 0);
+            pos.buffer.putInt(0);
+            pos.buffer.put((byte) calendar.get(Calendar.HOUR_OF_DAY));
+            pos.buffer.put((byte) calendar.get(Calendar.MINUTE));
+            pos.buffer.put((byte) calendar.get(Calendar.SECOND));
+        }
     }
 
     public MariaDbType getMariaDbType() {

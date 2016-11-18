@@ -117,6 +117,17 @@ public class StreamParameter implements ParameterHolder {
         return -1;
     }
 
+    public long getApproximateBinaryProtocolLength() {
+        return -1;
+    }
+
+    /**
+     * Write in binary format without checking buffer size.
+     * @param os buffer to write
+     */
+    public void writeUnsafeBinary(PacketOutputStream os) throws IOException {
+        writeBinary(os);
+    }
     /**
      * Write stream in binary format.
      * @param os database outputStream

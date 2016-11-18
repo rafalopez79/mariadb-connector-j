@@ -150,7 +150,7 @@ public class ComExecute {
                     //We know the additional query part size. This permit :
                     // - to resize buffer size if needed (to avoid resize test every write)
                     // - if this query will be separated in a new packet.
-                    if (writer.checkRewritableLength(staticLength + parameterLength)) {
+                    if (writer.belowMaxAllowedPacket(staticLength + parameterLength)) {
                         writer.assureBufferCapacity(staticLength + parameterLength);
                         writer.buffer.put((byte)';');
                         writer.buffer.put(firstPart, 0, firstPart.length);
@@ -209,7 +209,7 @@ public class ComExecute {
                     //We know the additional query part size. This permit :
                     // - to resize buffer size if needed (to avoid resize test every write)
                     // - if this query will be separated in a new packet.
-                    if (writer.checkRewritableLength(1 + parameterLength + intermediatePartLength + lastPartLength)) {
+                    if (writer.belowMaxAllowedPacket(1 + parameterLength + intermediatePartLength + lastPartLength)) {
                         writer.assureBufferCapacity(1 + parameterLength + intermediatePartLength + lastPartLength);
                         writer.buffer.put((byte) ',');
                         writer.buffer.put(secondPart, 0, secondPart.length);
@@ -260,7 +260,7 @@ public class ComExecute {
         //add query with ";"
         while (currentIndex < queries.size()) {
             byte[] sqlByte = queries.get(currentIndex).getBytes("UTF-8");
-            if (!writer.checkRewritableLength(sqlByte.length + 1)) break;
+            if (!writer.belowMaxAllowedPacket(sqlByte.length + 1)) break;
             writer.write(';');
             writer.write(sqlByte);
             currentIndex++;

@@ -114,6 +114,10 @@ public class MultiVariableIntExecutionResult implements MultiExecutionResult {
         this.insertId.add(null);
     }
 
+    public void fixStatsUnknown() {
+        //no implementation
+    }
+
     /**
      * Add missing information when Exception is thrown.
      * @param sendCommand send number of command
