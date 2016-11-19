@@ -1022,7 +1022,7 @@ public class ServerPrepareStatementTest extends BaseTest {
 
     @Test
     public void testVeryBigData() throws  SQLException {
-        executionVeryBigData(30);
+        executionVeryBigData(100);
     }
 
     @Test
