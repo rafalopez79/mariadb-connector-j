@@ -1022,12 +1022,14 @@ public class ServerPrepareStatementTest extends BaseTest {
 
     @Test
     public void testVeryBigData() throws  SQLException {
+        Assume.assumeTrue(!checkMaxAllowedPacketMore40m("testVeryBigData", false)); //avoid oom
         executionVeryBigData(100);
     }
 
     @Test
     public void testVeryBigDataMustFail() throws  SQLException {
         try {
+            Assume.assumeTrue(!checkMaxAllowedPacketMore40m("testVeryBigData", false)); //avoid oom
             executionVeryBigData(0);
             fail("Must have thrown error, because unit case > max_allowed_packet");
         } catch (SQLException e) {
