@@ -234,7 +234,7 @@ public abstract class AbstractMultiSend {
 
                     //read prepare result
                     try {
-                        prepareResult = comStmtPrepare.read(protocol.getPacketFetcher());
+                        prepareResult = comStmtPrepare.read(protocol.getPacketFetcher(), protocol.getServerCapabilities());
                         statementId = ((ServerPrepareResult) prepareResult).getStatementId();
                         paramCount = getParamCount();
                     } catch (QueryException queryException) {

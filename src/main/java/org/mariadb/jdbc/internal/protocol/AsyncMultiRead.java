@@ -72,7 +72,7 @@ public class AsyncMultiRead implements Callable<AsyncMultiReadResult> {
 
         if (readPrepareStmtResult) {
             try {
-                asyncMultiReadResult.setPrepareResult(comStmtPrepare.read(protocol.getPacketFetcher()));
+                asyncMultiReadResult.setPrepareResult(comStmtPrepare.read(protocol.getPacketFetcher(), protocol.getServerCapabilities()));
             } catch (QueryException queryException) {
                 asyncMultiReadResult.setException(queryException);
             }
@@ -81,7 +81,7 @@ public class AsyncMultiRead implements Callable<AsyncMultiReadResult> {
         //read all corresponding results
         for (int counter = 0; counter < nbResult; counter++) {
             try {
-                protocol.getResult(executionResult, resultSetScrollType, binaryProtocol, true);
+                protocol.getResult(executionResult, resultSetScrollType, binaryProtocol, true, false);
             } catch (QueryException qex) {
                 if (asyncMultiReadResult.getException() == null) {
                     asyncMultiReadResult.setException(bulkSend.handleResultException(qex, executionResult,

@@ -104,6 +104,7 @@ public abstract class AbstractConnectProtocol implements Protocol {
     private final String password;
     private boolean hostFailed;
     private String version;
+    protected long serverCapabilities;
     protected boolean checkCallableResultSet;
     private int majorVersion;
     private int minorVersion;
@@ -475,7 +476,7 @@ public abstract class AbstractConnectProtocol implements Protocol {
             this.version = greetingPacket.getServerVersion();
             supportArrayBinding = (greetingPacket.getServerCapabilities() & MariaDbServerCapabilities.MARIADB_CLIENT_STMT_BULK_OPERATIONS) != 0;
             this.checkCallableResultSet = this.version.indexOf("MariaDB") == -1;
-
+            this.serverCapabilities = greetingPacket.getServerCapabilities();
             byte exchangeCharset = decideLanguage(greetingPacket.getServerLanguage());
             parseVersion();
             long clientCapabilities = initializeClientCapabilities(greetingPacket.getServerCapabilities());
@@ -507,7 +508,7 @@ public abstract class AbstractConnectProtocol implements Protocol {
             }
 
             authentication(exchangeCharset, clientCapabilities, greetingPacket.getSeed(), packetSeq,
-                    greetingPacket.getPluginName(), greetingPacket.getServerCapabilities());
+                    greetingPacket.getPluginName());
 
         } catch (IOException e) {
             if (reader != null) {
@@ -522,7 +523,7 @@ public abstract class AbstractConnectProtocol implements Protocol {
         }
     }
 
-    private void authentication(byte exchangeCharset, long clientCapabilities, byte[] seed, byte packetSeq, String plugin, long serverCapabilities)
+    private void authentication(byte exchangeCharset, long clientCapabilities, byte[] seed, byte packetSeq, String plugin)
             throws QueryException, IOException {
         final SendHandshakeResponsePacket cap = new SendHandshakeResponsePacket(this.username,
                 this.password,
@@ -587,7 +588,8 @@ public abstract class AbstractConnectProtocol implements Protocol {
                         | MariaDbServerCapabilities.CONNECT_ATTRS
                         | MariaDbServerCapabilities.PLUGIN_AUTH_LENENC_CLIENT_DATA
                         | MariaDbServerCapabilities.MARIADB_CLIENT_COM_MULTI
-                        | MariaDbServerCapabilities.MARIADB_CLIENT_STMT_BULK_OPERATIONS;
+                        | MariaDbServerCapabilities.MARIADB_CLIENT_STMT_BULK_OPERATIONS
+                        | MariaDbServerCapabilities.CLIENT_DEPRECATE_EOF;
 
         if (options.allowMultiQueries || (options.rewriteBatchedStatements)) {
             capabilities |= MariaDbServerCapabilities.MULTI_STATEMENTS;
@@ -1091,4 +1093,12 @@ public abstract class AbstractConnectProtocol implements Protocol {
         return supportArrayBinding;
     }
 
+    @Override
+    public void setServerStatus(short serverStatus) {
+        this.serverStatus = serverStatus;
+    }
+
+    public long getServerCapabilities() {
+        return serverCapabilities;
+    }
 }

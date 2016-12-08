@@ -171,8 +171,8 @@ public interface Protocol {
                                           ExecutionResult executionResult, String sql,
                                           ParameterHolder[] parameters, int resultSetScrollType) throws QueryException;
 
-    ExecutionResult getResult(ExecutionResult executionResult, int resultSetScrollType, boolean binaryProtocol, boolean loadAllResults)
-            throws QueryException;
+    ExecutionResult getResult(ExecutionResult executionResult, int resultSetScrollType, boolean binaryProtocol, boolean loadAllResults,
+                              boolean retreiveResultSetInserts) throws QueryException;
 
     void cancelCurrentQuery() throws QueryException, IOException;
 
@@ -269,4 +269,7 @@ public interface Protocol {
 
     boolean isSupportArrayBinding();
 
+    void setServerStatus(short serverStatus);
+
+    long getServerCapabilities();
 }

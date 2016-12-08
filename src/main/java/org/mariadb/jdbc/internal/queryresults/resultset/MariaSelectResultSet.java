@@ -104,7 +104,7 @@ public class MariaSelectResultSet implements ResultSet {
     private ColumnInformation[] columnsInformation;
 
     private byte[] lastReusableArray = null;
-    private boolean isEof;
+    private boolean readAllRows;
     private boolean isBinaryEncoded;
     private int dataFetchTime;
     private boolean streaming;
@@ -162,7 +162,7 @@ public class MariaSelectResultSet implements ResultSet {
         this.columnInformationLength = columnInformation.length;
         this.packetFetcher = fetcher;
         this.inputStream = packetFetcher.getInputStream();
-        this.isEof = false;
+        this.readAllRows = false;
         this.isBinaryEncoded = isBinaryEncoded;
         this.fetchSize = fetchSize;
         this.resultSetScrollType = resultSetScrollType;
@@ -201,7 +201,7 @@ public class MariaSelectResultSet implements ResultSet {
         this.columnsInformation = columnInformation;
         this.columnNameMap = new ColumnNameMap(columnsInformation);
         this.columnInformationLength = columnInformation.length;
-        this.isEof = false;
+        this.readAllRows = false;
         this.isBinaryEncoded = false;
         this.fetchSize = 1;
         this.resultSetScrollType = resultSetScrollType;
@@ -402,6 +402,33 @@ public class MariaSelectResultSet implements ResultSet {
             if (logger.isTraceEnabled()) logger.trace("read packet data(part):0x" + Integer.valueOf(String.valueOf(read), 16));
             int remaining = length - 1;
 
+
+            if (read == 0 && !isBinaryEncoded) { //OK_packet
+                Buffer buffer = packetFetcher.getReusableBuffer(remaining, lastReusableArray);
+                buffer.getLengthEncodedBinary(); //affectedRows
+                buffer.getLengthEncodedBinary(); //insertId
+                short serverStatus = buffer.readShort();
+                protocol.setServerStatus(serverStatus);
+                protocol.setHasWarnings(buffer.readShort() > 0);
+                //force the more packet value when this is a callable output result.
+                //There is always a OK packet after a callable output result, but mysql 5.6-7
+                //is sending a bad "more result" flag (without setting more packet to true)
+                //so force the value, since this will corrupt connection.
+                boolean hasMoreResults = callableResult || (serverStatus & ServerStatus.MORE_RESULTS_EXISTS) != 0;
+                protocol.setMoreResults(hasMoreResults, isBinaryEncoded);
+
+                if (!hasMoreResults) {
+                    if (protocol.getActiveStreamingResult() == this) protocol.setActiveStreamingResult(null);
+                    protocol = null;
+                    packetFetcher = null;
+                    inputStream = null;
+                }
+                lastReusableArray = null;
+                readAllRows = true;
+                return false;
+
+            }
+
             if (read == 255) { //ERROR packet
                 protocol.setActiveStreamingResult(null);
                 Buffer buffer = packetFetcher.getReusableBuffer(remaining, lastReusableArray);
@@ -434,7 +461,7 @@ public class MariaSelectResultSet implements ResultSet {
                     inputStream = null;
                 }
                 lastReusableArray = null;
-                isEof = true;
+                readAllRows = true;
                 return false;
             }
 
@@ -466,7 +493,7 @@ public class MariaSelectResultSet implements ResultSet {
             protocol = null;
             packetFetcher = null;
             inputStream = null;
-            isEof = true;
+            readAllRows = true;
             lastReusableArray = null;
             return false;
         }
@@ -485,7 +512,7 @@ public class MariaSelectResultSet implements ResultSet {
             lock.lock();
             try {
                 try {
-                    while (!isEof) {
+                    while (!readAllRows) {
                         //fetch all results
                         Buffer buffer = packetFetcher.getReusableBuffer();
 
@@ -506,7 +533,7 @@ public class MariaSelectResultSet implements ResultSet {
                                 if (protocol.getActiveStreamingResult() == this) protocol.setActiveStreamingResult(null);
                             }
                             lastReusableArray = null;
-                            isEof = true;
+                            readAllRows = true;
                         }
                     }
 
@@ -551,7 +578,7 @@ public class MariaSelectResultSet implements ResultSet {
             return true;
         } else {
             if (streaming) {
-                if (isEof) {
+                if (readAllRows) {
                     return false;
                 } else {
                     try {
@@ -637,7 +664,7 @@ public class MariaSelectResultSet implements ResultSet {
     @Override
     public boolean isLast() throws SQLException {
         checkClose();
-        if (dataFetchTime > 0 && isEof) {
+        if (dataFetchTime > 0 && readAllRows) {
             return rowPointer == resultSetSize - 1 && resultSetSize > 0;
         } else if (streaming) {
             try {

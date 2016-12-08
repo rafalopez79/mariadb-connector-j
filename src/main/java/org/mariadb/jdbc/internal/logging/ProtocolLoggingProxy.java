@@ -174,6 +174,7 @@ public class ProtocolLoggingProxy implements InvocationHandler {
             case "prepareAndExecutes":
                 List<ParameterHolder[]> parameterList = (List<ParameterHolder[]>) args[4];
                 ServerPrepareResult serverPrepareResult = (ServerPrepareResult) returnObj;
+                if (serverPrepareResult == null) serverPrepareResult = (ServerPrepareResult) args[1];
                 sql = getQueryFromPrepareParameters(serverPrepareResult.getSql(), parameterList, serverPrepareResult.getParamCount());
                 break;
             case "executeBatchRewrite":
