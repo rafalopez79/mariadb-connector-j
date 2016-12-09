@@ -22,6 +22,7 @@ public class DriverTest extends BaseTest {
 
     /**
      * Tables initialisation.
+     *
      * @throws SQLException exception
      */
     @BeforeClass()
@@ -34,28 +35,21 @@ public class DriverTest extends BaseTest {
         createTable("Drivert3", "id int not null primary key auto_increment, test varchar(10)");
         createTable("Drivert30", "id int not null primary key auto_increment, test varchar(20)", "engine=innodb");
         createTable("Drivert4", "id int not null primary key auto_increment, test varchar(20)", "engine=innodb");
-        createTable("test_batch", "id int not null primary key auto_increment, test varchar(10)");
-        createTable("test_batch2", "id int not null primary key auto_increment, test varchar(10)");
         createTable("test_float", "id int not null primary key auto_increment, a float");
         createTable("test_big_autoinc2", "id int not null primary key auto_increment, test varchar(10)");
         createTable("test_big_update", "id int primary key not null, updateme int");
         createTable("sharedConnection", "id int");
         createTable("extest", "id int not null primary key");
-        createTable("rewritetest", "id int not null primary key, a varchar(10), b int", "engine=innodb");
-        createTable("rewritetest2", "id int not null primary key, a varchar(10), b int", "engine=innodb");
         createTable("commentPreparedStatements", "id int not null primary key auto_increment, a varchar(10)");
         createTable("quotesPreparedStatements", "id int not null primary key auto_increment, a varchar(10) , "
                 + "b varchar(10)");
         createTable("ressetpos", "i int not null primary key", "engine=innodb");
-        createTable("bug501452", "id int not null primary key, value varchar(20)");
         createTable("streamingtest", "val varchar(20)");
         createTable("testBlob2", "a blob");
         createTable("testString2", "a varchar(10)");
         createTable("testBlob2", "a blob");
         createTable("unsignedtest", "a int unsigned");
         createTable("conj25", "a VARCHAR(1024)");
-        createTable("batchUpdateException", "i int,PRIMARY KEY (i)");
-        createTable("batchPrepareUpdateException", "i int,PRIMARY KEY (i)");
         createTable("DriverTestt1", "id int not null primary key auto_increment, test varchar(20)");
         createTable("DriverTestt2", "id int not null primary key auto_increment, test varchar(20)");
         createTable("DriverTestt3", "id int not null primary key auto_increment, test varchar(20)");
@@ -348,7 +342,6 @@ public class DriverTest extends BaseTest {
     }
 
 
-
     @Test
     public void testAliasReplication() throws SQLException {
         UrlParser url = UrlParser.parse("jdbc:mysql:replication://localhost/test");
@@ -407,67 +400,6 @@ public class DriverTest extends BaseTest {
                 fail();
             }
         }
-    }
-
-    @Test
-    public void batchTest() throws SQLException {
-        Assume.assumeFalse(sharedIsRewrite());
-        PreparedStatement ps = sharedConnection.prepareStatement("insert into test_batch values (null, ?)", 
-                Statement.RETURN_GENERATED_KEYS);
-        ps.setString(1, "aaa");
-        ps.addBatch();
-        ps.setString(1, "bbb");
-        ps.addBatch();
-        ps.setString(1, "ccc");
-        ps.addBatch();
-        int[] batchResult = ps.executeBatch();
-        ResultSet rs1 = ps.getGeneratedKeys();
-        for (int count = 1; count <= 3; count++) {
-            assertTrue(rs1.next());
-            assertTrue(String.valueOf(count).equalsIgnoreCase(rs1.getString(1)));
-        }
-        for (int unitInsertNumber : batchResult) {
-            assertEquals(1, unitInsertNumber);
-        }
-        ps.setString(1, "aaa");
-        ps.addBatch();
-        ps.setString(1, "bbb");
-        ps.addBatch();
-        ps.setString(1, "ccc");
-        ps.addBatch();
-        batchResult = ps.executeBatch();
-        for (int unitInsertNumber : batchResult) {
-            assertEquals(1, unitInsertNumber);
-        }
-        final ResultSet rs = sharedConnection.createStatement().executeQuery("select * from test_batch");
-        ps.executeQuery("SELECT 1");
-        rs1 = ps.getGeneratedKeys();
-        assertEquals(MariaSelectResultSet.EMPTY, rs1);
-        assertEquals(true, rs.next());
-        assertEquals("aaa", rs.getString(2));
-        assertEquals(true, rs.next());
-        assertEquals("bbb", rs.getString(2));
-        assertEquals(true, rs.next());
-        assertEquals("ccc", rs.getString(2));
-
-    }
-
-    @Test
-    public void batchTestStmt() throws SQLException {
-        Statement stmt = sharedConnection.createStatement();
-        stmt.addBatch("insert into test_batch2 values (null, 'hej1')");
-        stmt.addBatch("insert into test_batch2 values (null, 'hej2')");
-        stmt.addBatch("insert into test_batch2 values (null, 'hej3')");
-        stmt.addBatch("insert into test_batch2 values (null, 'hej4')");
-        stmt.executeBatch();
-        ResultSet rs = sharedConnection.createStatement().executeQuery("select * from test_batch2");
-        for (int i = 1; i <= 4; i++) {
-            assertEquals(true, rs.next());
-            assertEquals(i, rs.getInt(1));
-            assertEquals("hej" + i, rs.getString(2));
-        }
-        assertEquals(false, rs.next());
-
     }
 
     @Test
@@ -544,7 +476,6 @@ public class DriverTest extends BaseTest {
     }
 
 
-
     @Test(expected = SQLIntegrityConstraintViolationException.class)
     public void testException1() throws SQLException {
         sharedConnection.createStatement().execute("insert into extest values (1)");
@@ -563,43 +494,6 @@ public class DriverTest extends BaseTest {
         sharedConnection.createStatement().executeQuery("create asdf b");
     }
 
-    @Test
-    public void testBatchLoop() throws SQLException {
-        PreparedStatement ps = sharedConnection.prepareStatement("insert into rewritetest values (?,?,?)");
-        for (int i = 0; i < 10; i++) {
-            ps.setInt(1, i);
-            ps.setString(2, "bbb" + i);
-            ps.setInt(3, 30 + i);
-            ps.addBatch();
-        }
-        ps.executeBatch();
-        ResultSet rs = sharedConnection.createStatement().executeQuery("select * from rewritetest");
-        int counter = 0;
-        while (rs.next()) {
-            assertEquals(counter++, rs.getInt("id"));
-        }
-        assertEquals(10, counter);
-    }
-
-    @Test
-    public void testBatchLoopWithDupKey() throws SQLException {
-        PreparedStatement ps = sharedConnection.prepareStatement(
-                "insert into rewritetest2 values (?,?,?) on duplicate key update a=values(a)");
-        for (int i = 0; i < 2; i++) {
-            ps.setInt(1, 0);
-            ps.setString(2, "bbb" + i);
-            ps.setInt(3, 30 + i);
-            ps.addBatch();
-        }
-        ps.executeBatch();
-
-        ResultSet rs = sharedConnection.createStatement().executeQuery("select * from rewritetest2");
-        int counter = 0;
-        while (rs.next()) {
-            assertEquals(counter++, rs.getInt("id"));
-        }
-        assertEquals(1, counter);
-    }
 
     @Test
     public void testPreparedStatementsWithComments() throws SQLException {
@@ -629,7 +523,7 @@ public class DriverTest extends BaseTest {
         assertTrue(rs.isFirst());
         rs.beforeFirst();
         assertTrue(rs.isBeforeFirst());
-        while (rs.next()){
+        while (rs.next()) {
             //just load datas.
         }
         assertTrue(rs.isAfterLast());
@@ -672,22 +566,6 @@ public class DriverTest extends BaseTest {
         Statement stmt1 = sharedConnection.createStatement();
         ResultSet rs = stmt1.executeQuery("select 1 as 'hej'");
         assertEquals(stmt1, rs.getStatement());
-    }
-
-    @Test
-    public void testBug501452() throws SQLException {
-        PreparedStatement ps = sharedConnection.prepareStatement("insert into bug501452 (id,value) values (?,?)");
-        ps.setObject(1, 1);
-        ps.setObject(2, "value for 1");
-        ps.addBatch();
-
-        ps.executeBatch();
-
-        ps.setObject(1, 2);
-        ps.setObject(2, "value for 2");
-        ps.addBatch();
-
-        ps.executeBatch();
     }
 
     @Test
@@ -936,7 +814,6 @@ public class DriverTest extends BaseTest {
     }
 
 
-
     @Test
     // Bug in URL parser
     public void mdev3916() throws Exception {
@@ -959,7 +836,7 @@ public class DriverTest extends BaseTest {
             st.setQueryTimeout(1);
             st.execute("select sleep(0.5)");
             try {
-                st.execute("select sleep(1.5)");
+                st.execute("select * from information_schema.columns as c1,  information_schema.tables, information_schema.tables as t2");
                 assertFalse("must be exception here", true);
             } catch (Exception e) {
                 //normal exception
@@ -968,11 +845,15 @@ public class DriverTest extends BaseTest {
             Statement st2 = connection.createStatement();
             assertEquals(st2.getQueryTimeout(), 0);
             // no exception
-            st2.execute("select sleep(1.5)");
-
+            ResultSet rs = st2.executeQuery("select sleep(1.5)");
+            assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1));
             Statement st3 = connection.createStatement();
+
             st3.setQueryTimeout(1);
-            st3.execute("select sleep(0.1)");
+            rs = st3.executeQuery("select sleep(0.1)");
+            assertTrue(rs.next());
+            assertEquals(0, rs.getInt(1));
             assertEquals(st3.getQueryTimeout(), 1);
         }
     }
@@ -1137,71 +1018,6 @@ public class DriverTest extends BaseTest {
     }
 
     @Test
-    public void batchUpdateException() throws Exception {
-        Statement st = sharedConnection.createStatement();
-        st.addBatch("insert into batchUpdateException values(1)");
-        st.addBatch("insert into batchUpdateException values(2)");
-        st.addBatch("insert into batchUpdateException values(1)"); // will fail, duplicate primary key
-        st.addBatch("insert into batchUpdateException values(3)");
-
-        try {
-            st.executeBatch();
-            fail("exception should be throw above");
-        } catch (BatchUpdateException bue) {
-            int[] updateCounts = bue.getUpdateCounts();
-            assertEquals(4, updateCounts.length);
-            if (sharedIsRewrite()) {
-                assertEquals(1, updateCounts[0]);
-                assertEquals(1, updateCounts[1]);
-                assertEquals(Statement.EXECUTE_FAILED, updateCounts[2]);
-                assertEquals(Statement.EXECUTE_FAILED, updateCounts[3]);
-            } else {
-                //prepare or allowMultiQueries options
-                assertEquals(1, updateCounts[0]);
-                assertEquals(1, updateCounts[1]);
-                assertEquals(Statement.EXECUTE_FAILED, updateCounts[2]);
-                assertEquals(1, updateCounts[3]);
-            }
-            assertTrue(bue.getCause() instanceof SQLIntegrityConstraintViolationException);
-        }
-    }
-
-    @Test
-    public void batchPrepareUpdateException() throws Exception {
-        PreparedStatement st = sharedConnection.prepareStatement("insert into batchPrepareUpdateException values(?)");
-        st.setInt(1, 1);
-        st.addBatch();
-        st.setInt(1, 2);
-        st.addBatch();
-        st.setInt(1, 1); // will fail, duplicate primary key
-        st.addBatch();
-        st.setInt(1, 3);
-        st.addBatch();
-
-        try {
-            st.executeBatch();
-            fail("exception should be throw above");
-        } catch (BatchUpdateException bue) {
-            int[] updateCounts = bue.getUpdateCounts();
-            assertEquals(4, updateCounts.length);
-            if (sharedIsRewrite()) {
-                assertEquals(Statement.EXECUTE_FAILED, updateCounts[0]);
-                assertEquals(Statement.EXECUTE_FAILED, updateCounts[1]);
-                assertEquals(Statement.EXECUTE_FAILED, updateCounts[2]);
-                assertEquals(Statement.EXECUTE_FAILED, updateCounts[3]);
-            } else {
-                //prepare or allowMultiQueries options
-                assertEquals(1, updateCounts[0]);
-                assertEquals(1, updateCounts[1]);
-                assertEquals(Statement.EXECUTE_FAILED, updateCounts[2]);
-                assertEquals(1, updateCounts[3]);
-            }
-            assertTrue(bue.getCause() instanceof SQLIntegrityConstraintViolationException);
-        }
-
-    }
-
-    @Test
     public void localSocket() throws Exception {
         requireMinimumVersion(5, 1);
 
@@ -1316,6 +1132,7 @@ public class DriverTest extends BaseTest {
 
     /**
      * CONJ-275 : Streaming resultSet with no result must not have a next() value to true.
+     *
      * @throws Exception exception
      */
     @Test

@@ -1,6 +1,7 @@
 package org.mariadb.jdbc;
 
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -17,6 +18,7 @@ public class CancelTest extends BaseTest {
     @Before
     public void cancelSupported() throws SQLException {
         requireMinimumVersion(5, 0);
+        Assume.assumeFalse("MAXSCALE".equals(System.getenv("TYPE")));
     }
 
     @Test
@@ -48,7 +50,7 @@ public class CancelTest extends BaseTest {
             tmpConnection = openNewConnection(connUri, new Properties());
             Statement stmt = tmpConnection.createStatement();
             stmt.setQueryTimeout(1);
-            stmt.execute("select sleep(100)");
+            stmt.execute("select * from information_schema.columns as c1,  information_schema.tables, information_schema.tables as t2");
         } finally {
             tmpConnection.close();
         }

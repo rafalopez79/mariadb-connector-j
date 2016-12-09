@@ -34,13 +34,13 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
     public void testRewritableWithConstantParameter() throws Exception {
         checkParsing("INSERT INTO TABLE(col1,col2,col3,col4, col5) VALUES (9, ?, 5, ?, 8) ON DUPLICATE KEY UPDATE col2=col2+10",
                 2, true, true,
-                new String[] {
+                new String[]{
                         "INSERT INTO TABLE(col1,col2,col3,col4, col5) VALUES",
                         " (9, ",
                         ", 5, ",
                         ", 8)",
                         " ON DUPLICATE KEY UPDATE col2=col2+10"},
-                new String[] {
+                new String[]{
                         "INSERT INTO TABLE(col1,col2,col3,col4, col5) VALUES (9, ",
                         ", 5, ",
                         ", 8) ON DUPLICATE KEY UPDATE col2=col2+10"});
@@ -49,14 +49,14 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
     @Test
     public void testComment() throws Exception {
         checkParsing("/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */"
-                + " INSERT into "
-                + "/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */"
-                + " tt VALUES "
-                + "/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */"
-                + " (?) "
-                + "/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */",
+                        + " INSERT into "
+                        + "/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */"
+                        + " tt VALUES "
+                        + "/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */"
+                        + " (?) "
+                        + "/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */",
                 1, true, true,
-                new String[] {
+                new String[]{
                         "/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */"
                                 + " INSERT into "
                                 + "/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */"
@@ -64,28 +64,28 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
                         " /* insert Select INSERT INTO tt VALUES (?,?,?,?)  */ (",
                         ")",
                         " /* insert Select INSERT INTO tt VALUES (?,?,?,?)  */"},
-                new String[] {"/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */"
+                new String[]{"/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */"
                         + " INSERT into "
                         + "/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */"
                         + " tt VALUES "
                         + "/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */"
                         + " (",
                         ") "
-                        + "/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */"});
+                                + "/* insert Select INSERT INTO tt VALUES (?,?,?,?)  */"});
     }
 
     @Test
     public void testRewritableWithConstantParameterAndParamAfterValue() throws Exception {
         checkParsing("INSERT INTO TABLE(col1,col2,col3,col4, col5) VALUES (9, ?, 5, ?, 8) ON DUPLICATE KEY UPDATE col2=?",
                 3, false, true,
-                new String[] {
+                new String[]{
                         "INSERT INTO TABLE(col1,col2,col3,col4, col5) VALUES",
                         " (9, ",
                         ", 5, ",
                         ", 8) ON DUPLICATE KEY UPDATE col2=",
                         "",
                         ""},
-                new String[] {"INSERT INTO TABLE(col1,col2,col3,col4, col5) VALUES (9, ",
+                new String[]{"INSERT INTO TABLE(col1,col2,col3,col4, col5) VALUES (9, ",
                         ", 5, ",
                         ", 8) ON DUPLICATE KEY UPDATE col2=",
                         ""});
@@ -95,7 +95,7 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
     public void testRewritableMultipleInserts() throws Exception {
         checkParsing("INSERT INTO TABLE(col1,col2) VALUES (?, ?), (?, ?)",
                 4, false, true,
-                new String[] {
+                new String[]{
                         "INSERT INTO TABLE(col1,col2) VALUES",
                         " (",
                         ", ",
@@ -103,7 +103,7 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
                         ", ",
                         ")",
                         ""},
-                new String[] {"INSERT INTO TABLE(col1,col2) VALUES (",
+                new String[]{"INSERT INTO TABLE(col1,col2) VALUES (",
                         ", ",
                         "), (",
                         ", ",
@@ -115,13 +115,13 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
     public void testCall() throws Exception {
         checkParsing("CALL dsdssd(?,?)",
                 2, false, true,
-                new String[] {
+                new String[]{
                         "CALL dsdssd(",
                         "",
                         ",",
                         ")",
                         ""},
-                new String[] {"CALL dsdssd(",
+                new String[]{"CALL dsdssd(",
                         ",",
                         ")"});
     }
@@ -130,13 +130,13 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
     public void testUpdate() throws Exception {
         checkParsing("UPDATE MultiTestt4 SET test = ? WHERE test = ?",
                 2, false, true,
-                new String[] {
+                new String[]{
                         "UPDATE MultiTestt4 SET test = ",
                         "",
                         " WHERE test = ",
                         "",
                         ""},
-                new String[] {"UPDATE MultiTestt4 SET test = ",
+                new String[]{"UPDATE MultiTestt4 SET test = ",
                         " WHERE test = ",
                         ""});
     }
@@ -145,12 +145,12 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
     public void testInsertSelect() throws Exception {
         checkParsing("insert into test_insert_select ( field1) (select  TMP.field1 from (select CAST(? as binary) `field1` from dual) TMP)",
                 1, false, true,
-                new String[] {
+                new String[]{
                         "insert into test_insert_select ( field1) (select  TMP.field1 from (select CAST(",
                         "",
                         " as binary) `field1` from dual) TMP)",
                         ""},
-                new String[] {"insert into test_insert_select ( field1) (select  TMP.field1 from (select CAST(",
+                new String[]{"insert into test_insert_select ( field1) (select  TMP.field1 from (select CAST(",
                         " as binary) `field1` from dual) TMP)"});
     }
 
@@ -158,45 +158,45 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
     public void testWithoutParameter() throws Exception {
         checkParsing("SELECT testFunction()",
                 0, false, true,
-                new String[] {
+                new String[]{
                         "SELECT testFunction()",
                         "",
                         ""},
-                new String[] {"SELECT testFunction()"});
+                new String[]{"SELECT testFunction()"});
     }
 
     @Test
     public void testWithoutParameterAndParenthesis() throws Exception {
         checkParsing("SELECT 1",
                 0, false, true,
-                new String[] {
+                new String[]{
                         "SELECT 1",
                         "",
                         ""},
-                new String[] {"SELECT 1"});
+                new String[]{"SELECT 1"});
     }
 
     @Test
     public void testWithoutParameterAndValues() throws Exception {
         checkParsing("INSERT INTO tt VALUES (1)",
                 0, true, true,
-                new String[] {
+                new String[]{
                         "INSERT INTO tt VALUES",
                         " (1)",
                         ""},
-                new String[] {"INSERT INTO tt VALUES (1)"});
+                new String[]{"INSERT INTO tt VALUES (1)"});
     }
 
     @Test
     public void testSemiColon() throws Exception {
         checkParsing("INSERT INTO tt (tt) VALUES (?); INSERT INTO tt (tt) VALUES ('multiple')",
                 1, false, true,
-                new String[] {
+                new String[]{
                         "INSERT INTO tt (tt) VALUES",
                         " (",
                         ")",
                         "; INSERT INTO tt (tt) VALUES ('multiple')"},
-                new String[] {"INSERT INTO tt (tt) VALUES (",
+                new String[]{"INSERT INTO tt (tt) VALUES (",
                         "); INSERT INTO tt (tt) VALUES ('multiple')"});
     }
 
@@ -204,12 +204,12 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
     public void testSemicolonRewritableIfAtEnd() throws Exception {
         checkParsing("INSERT INTO table (column1) VALUES (?); ",
                 1, true, false,
-                new String[] {
+                new String[]{
                         "INSERT INTO table (column1) VALUES",
                         " (",
                         ")",
                         "; "},
-                new String[] {"INSERT INTO table (column1) VALUES (",
+                new String[]{"INSERT INTO table (column1) VALUES (",
                         "); "});
     }
 
@@ -217,12 +217,12 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
     public void testSemicolonNotRewritableIfNotAtEnd() throws Exception {
         checkParsing("INSERT INTO table (column1) VALUES (?); SELECT 1",
                 1, false, true,
-                new String[] {
+                new String[]{
                         "INSERT INTO table (column1) VALUES",
                         " (",
                         ")",
                         "; SELECT 1"},
-                new String[] {"INSERT INTO table (column1) VALUES (",
+                new String[]{"INSERT INTO table (column1) VALUES (",
                         "); SELECT 1"});
     }
 
@@ -230,12 +230,12 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
     public void testError() throws Exception {
         checkParsing("INSERT INTO tt (tt) VALUES (?); INSERT INTO tt (tt) VALUES ('multiple')",
                 1, false, true,
-                new String[] {
+                new String[]{
                         "INSERT INTO tt (tt) VALUES",
                         " (",
                         ")",
                         "; INSERT INTO tt (tt) VALUES ('multiple')"},
-                new String[] {"INSERT INTO tt (tt) VALUES (",
+                new String[]{"INSERT INTO tt (tt) VALUES (",
                         "); INSERT INTO tt (tt) VALUES ('multiple')"});
     }
 
@@ -244,12 +244,12 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
     public void testLineComment() throws Exception {
         checkParsing("INSERT INTO tt (tt) VALUES (?) --fin",
                 1, true, false,
-                new String[] {
+                new String[]{
                         "INSERT INTO tt (tt) VALUES",
                         " (",
                         ")",
                         " --fin"},
-                new String[] {"INSERT INTO tt (tt) VALUES (",
+                new String[]{"INSERT INTO tt (tt) VALUES (",
                         ") --fin"});
     }
 
@@ -257,12 +257,12 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
     public void testLineCommentFinished() throws Exception {
         checkParsing("INSERT INTO tt (tt) VALUES --fin\n (?)",
                 1, true, true,
-                new String[] {
+                new String[]{
                         "INSERT INTO tt (tt) VALUES",
                         " --fin\n (",
                         ")",
                         ""},
-                new String[] {"INSERT INTO tt (tt) VALUES --fin\n (",
+                new String[]{"INSERT INTO tt (tt) VALUES --fin\n (",
                         ")"});
     }
 
@@ -270,11 +270,11 @@ public class ClientPreparedStatementParsingTest extends BaseTest {
     public void testSelect1() throws Exception {
         checkParsing("SELECT 1",
                 0, false, true,
-                new String[] {
+                new String[]{
                         "SELECT 1",
                         "",
                         ""},
-                new String[] {"SELECT 1"});
+                new String[]{"SELECT 1"});
     }
 
     @Test

@@ -78,7 +78,7 @@ public class ComStmtPrepare {
      * Send directly to socket the sql data.
      *
      * @param writer the writer
-     * @throws IOException if connection error occur
+     * @throws IOException    if connection error occur
      * @throws QueryException if packet max size is to big.
      */
     public void send(PacketOutputStream writer) throws IOException, QueryException {
@@ -89,7 +89,7 @@ public class ComStmtPrepare {
      * Send sub-command (COM_MULTI) to write socket.
      *
      * @param writer the writer
-     * @throws IOException if connection error occur
+     * @throws IOException    if connection error occur
      * @throws QueryException if packet max size is to big.
      */
     public void sendSubCmd(PacketOutputStream writer) throws IOException, QueryException {
@@ -106,7 +106,7 @@ public class ComStmtPrepare {
      * @param packetFetcher inputStream
      * @param serverCapabilities server capabilities
      * @return ServerPrepareResult prepare result
-     * @throws IOException is connection has error
+     * @throws IOException    is connection has error
      * @throws QueryException if server answer with error.
      */
     public ServerPrepareResult read(ReadPacketFetcher packetFetcher, long serverCapabilities) throws IOException, QueryException {

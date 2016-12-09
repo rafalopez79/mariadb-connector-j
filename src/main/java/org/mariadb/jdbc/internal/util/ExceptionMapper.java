@@ -66,15 +66,17 @@ public class ExceptionMapper {
     /**
      * Helper to throw exception. Exception is logged.
      *
-     * @param exception exception
+     * @param exception  exception
      * @param connection current connection
-     * @param statement current statement
-     * @param logger logger
+     * @param statement  current statement
+     * @param logger     logger
+     * @param timeout    was timeout on query
      * @throws SQLException exception
      */
-    public static void throwAndLogException(QueryException exception, MariaDbConnection connection, MariaDbStatement statement, Logger logger)
+    public static void throwAndLogException(QueryException exception, MariaDbConnection connection,
+                                            MariaDbStatement statement, Logger logger, boolean timeout)
             throws SQLException {
-        SQLException sqlException = getException(exception, connection, statement);
+        SQLException sqlException = getException(exception, connection, statement, timeout);
         logger.error("error executing query", sqlException);
         throw sqlException;
     }
@@ -82,23 +84,24 @@ public class ExceptionMapper {
     /**
      * Helper to throw exception.
      *
-     * @param exception exception
+     * @param exception  exception
      * @param connection current connection
-     * @param statement current statement
+     * @param statement  current statement
      * @throws SQLException exception
      */
     public static void throwException(QueryException exception, MariaDbConnection connection, MariaDbStatement statement) throws SQLException {
-        throw getException(exception, connection, statement);
+        throw getException(exception, connection, statement, false);
     }
 
-    private static SQLException getException(QueryException exception, MariaDbConnection connection, MariaDbStatement statement) {
+    private static SQLException getException(QueryException exception, MariaDbConnection connection,
+                                             MariaDbStatement statement, boolean timeout) {
         String message = exception.getMessage();
         if (connection != null) {
             message = "(conn:" + connection.getServerThreadId() + ") " + message;
         } else if (statement != null) {
             message = "(conn:" + statement.getServerThreadId() + ") " + message;
         }
-        SQLException sqlException = get(message, exception);
+        SQLException sqlException = get(message, exception, timeout);
         String sqlState = exception.getSqlState();
         SqlStates state = SqlStates.fromString(sqlState);
         if (connection != null) {
@@ -115,7 +118,7 @@ public class ExceptionMapper {
         return sqlException;
     }
 
-    private static SQLException get(final String message, final QueryException exception) {
+    private static SQLException get(final String message, final QueryException exception, boolean timeout) {
         final String sqlState = exception.getSqlState();
         final SqlStates state = SqlStates.fromString(sqlState);
         if (exception.isPrepareError()) return new PrepareSqlException(message, (PrepareException) exception);
@@ -137,6 +140,9 @@ public class ExceptionMapper {
             case WARNING:
                 return new SQLWarning(message, sqlState, exception.getErrorCode(), exception);
             case INTERRUPTED_EXCEPTION:
+                if (timeout && "70100".equals(sqlState)) {
+                    return new SQLTimeoutException(message, sqlState, exception.getErrorCode(), exception);
+                }
                 return new java.sql.SQLTransientException(message, sqlState, exception.getErrorCode(), exception);
             case TIMEOUT_EXCEPTION:
                 return new SQLTimeoutException(message, sqlState, exception.getErrorCode(), exception);
@@ -164,6 +170,7 @@ public class ExceptionMapper {
 
     /**
      * Mapp code to State.
+     *
      * @param code code
      * @return String
      */

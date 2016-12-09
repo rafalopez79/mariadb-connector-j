@@ -50,33 +50,35 @@ OF SUCH DAMAGE.
 
 package org.mariadb.jdbc.internal.protocol;
 
+import org.mariadb.jdbc.LocalInfileInterceptor;
 import org.mariadb.jdbc.MariaDbConnection;
 import org.mariadb.jdbc.MariaDbStatement;
 import org.mariadb.jdbc.UrlParser;
 import org.mariadb.jdbc.internal.MariaDbServerCapabilities;
 import org.mariadb.jdbc.internal.MariaDbType;
-import org.mariadb.jdbc.internal.logging.Logger;
-import org.mariadb.jdbc.internal.logging.LoggerFactory;
 import org.mariadb.jdbc.internal.packet.*;
-
-import org.mariadb.jdbc.internal.packet.result.*;
-import org.mariadb.jdbc.internal.packet.send.*;
-import org.mariadb.jdbc.internal.queryresults.*;
+import org.mariadb.jdbc.internal.packet.dao.ColumnInformation;
+import org.mariadb.jdbc.internal.packet.dao.parameters.ParameterHolder;
+import org.mariadb.jdbc.internal.packet.result.EndOfFilePacket;
+import org.mariadb.jdbc.internal.packet.result.ErrorPacket;
+import org.mariadb.jdbc.internal.packet.send.SendChangeDbPacket;
+import org.mariadb.jdbc.internal.packet.send.SendPingPacket;
+import org.mariadb.jdbc.internal.queryresults.ExecutionResult;
+import org.mariadb.jdbc.internal.queryresults.MultiFixedIntExecutionResult;
+import org.mariadb.jdbc.internal.queryresults.MultiVariableIntExecutionResult;
+import org.mariadb.jdbc.internal.queryresults.SingleExecutionResult;
 import org.mariadb.jdbc.internal.queryresults.resultset.MariaSelectResultSet;
 import org.mariadb.jdbc.internal.stream.MaxAllowedPacketException;
 import org.mariadb.jdbc.internal.stream.PacketOutputStream;
 import org.mariadb.jdbc.internal.util.BulkStatus;
 import org.mariadb.jdbc.internal.util.ExceptionMapper;
 import org.mariadb.jdbc.internal.util.Utils;
+import org.mariadb.jdbc.internal.util.buffer.Buffer;
+import org.mariadb.jdbc.internal.util.constant.ServerStatus;
 import org.mariadb.jdbc.internal.util.dao.ClientPrepareResult;
 import org.mariadb.jdbc.internal.util.dao.PrepareResult;
 import org.mariadb.jdbc.internal.util.dao.QueryException;
-import org.mariadb.jdbc.internal.util.constant.ServerStatus;
-import org.mariadb.jdbc.internal.util.buffer.Buffer;
-import org.mariadb.jdbc.internal.packet.dao.parameters.ParameterHolder;
-import org.mariadb.jdbc.internal.packet.dao.ColumnInformation;
 import org.mariadb.jdbc.internal.util.dao.ServerPrepareResult;
-import org.mariadb.jdbc.LocalInfileInterceptor;
 
 import java.io.*;
 import java.net.SocketException;
@@ -87,18 +89,14 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.List;
 import java.util.ServiceLoader;
 import java.util.concurrent.locks.ReentrantLock;
 
-import static org.mariadb.jdbc.internal.util.SqlStates.CONNECTION_EXCEPTION;
-import static org.mariadb.jdbc.internal.util.SqlStates.INTERRUPTED_EXCEPTION;
-import static org.mariadb.jdbc.internal.util.SqlStates.FEATURE_NOT_SUPPORTED;
+import static org.mariadb.jdbc.internal.util.SqlStates.*;
 
 
 public class AbstractQueryProtocol extends AbstractConnectProtocol implements Protocol {
-    private static Logger logger = LoggerFactory.getLogger(AbstractQueryProtocol.class);
 
     private int transactionIsolationLevel = 0;
     private InputStream localInfileInputStream;
@@ -225,7 +223,9 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
                 ParameterHolder[] parameters = parametersList.get(counter);
                 List<byte[]> queryParts = clientPrepareResult.getQueryParts();
                 String sql = new String(queryParts.get(0));
-                for (int i = 0; i < paramCount; i++) sql += parameters[i].toString() + new String(queryParts.get(i + 1));
+                for (int i = 0; i < paramCount; i++) {
+                    sql += parameters[i].toString() + new String(queryParts.get(i + 1));
+                }
                 return addQueryInfo(sql, qex);
             }
 
@@ -532,8 +532,8 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
      * @throws QueryException if parameter error or connection error occur.
      */
     public ServerPrepareResult prepareAndExecute(boolean mustExecuteOnMaster, ServerPrepareResult serverPrepareResult,
-                                                  ExecutionResult executionResult, String sql,
-                                                  final ParameterHolder[] parameters, int resultSetScrollType)
+                                                 ExecutionResult executionResult, String sql,
+                                                 final ParameterHolder[] parameters, int resultSetScrollType)
             throws QueryException {
 
         cmdPrologue();
@@ -698,6 +698,7 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
     /**
      * Force release of prepare statement that are not used.
      * This permit to deallocate a statement that cannot be release due to multi-thread use.
+     *
      * @throws QueryException if connection occur
      */
     public void forceReleaseWaitingPrepareStatement() throws QueryException {
@@ -812,21 +813,6 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
         writer.sendFile(is, seq);
         is.close();
         getResult(executionResult, ResultSet.TYPE_FORWARD_ONLY, false, true, false);
-    }
-
-    private ServerPrepareResult getPrepareResultFromCacheIfNeeded(ServerPrepareResult serverPrepareResult, String sql)
-            throws UnsupportedEncodingException {
-        if (serverPrepareResult == null) {
-            if (options.cachePrepStmts) {
-                String key = new StringBuilder(database).append("-").append(sql).toString();
-                serverPrepareResult = serverPrepareStatementCache.get(key);
-                if (serverPrepareResult != null && !serverPrepareResult.incrementShareCounter()) {
-                    //in cache but been de-allocated
-                    return null;
-                }
-            }
-        }
-        return serverPrepareResult;
     }
 
     @Override
@@ -1210,8 +1196,8 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
                         Buffer bufferEof = packetFetcher.getReusableBuffer();
                         if (bufferEof.getByteAt(0) != Packet.EOF) {
                             throw new QueryException("Packets out of order when reading field packets, expected was EOF stream. "
-                                    + "Packet contents (hex) = " + Utils.hexdump(bufferEof.buf, options.maxQuerySizeToLog, 0));
-                        } else if (executionResult.isCanHaveCallableResultset() || checkCallableResultSet) {
+                                    + "Packet contents (hex) = " + Utils.hexdump(bufferEof.buf, options.maxQuerySizeToLog, 0, buffer.position));
+                        } else if (executionResult.isCanHaveCallableResultSet() || checkCallableResultSet) {
                             //Identify if this is a "callable OUT packet" (callableResult=true)
                             //needed because :
                             // - will permit for callableStatement to identify the output result packet
@@ -1235,7 +1221,7 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
                             } catch (QueryException e) {
                             }
                         }
-                        if (!executionResult.isCanHaveCallableResultset() && !retrieveResultSetInserts) {
+                        if (!executionResult.isCanHaveCallableResultSet() && !retrieveResultSetInserts) {
                             throw new QueryException("Select command are not permitted via executeBatch() command");
                         }
                     }
@@ -1326,6 +1312,7 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
 
     /**
      * Retrieve prepare result from cache.
+     *
      * @param key cache key.
      * @return serverPrepareResult if found, null otherwise.
      */

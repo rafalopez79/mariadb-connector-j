@@ -50,12 +50,12 @@ OF SUCH DAMAGE.
 
 package org.mariadb.jdbc;
 
-import org.mariadb.jdbc.internal.util.ExceptionMapper;
-import org.mariadb.jdbc.internal.util.DefaultOptions;
-import org.mariadb.jdbc.internal.util.dao.QueryException;
-import org.mariadb.jdbc.internal.util.constant.HaMode;
-import org.mariadb.jdbc.internal.util.Utils;
 import org.mariadb.jdbc.internal.protocol.Protocol;
+import org.mariadb.jdbc.internal.util.DefaultOptions;
+import org.mariadb.jdbc.internal.util.ExceptionMapper;
+import org.mariadb.jdbc.internal.util.Utils;
+import org.mariadb.jdbc.internal.util.constant.HaMode;
+import org.mariadb.jdbc.internal.util.dao.QueryException;
 
 import javax.sql.*;
 import java.io.PrintWriter;
@@ -72,8 +72,9 @@ public class MariaDbDataSource implements DataSource, ConnectionPoolDataSource, 
 
     /**
      * Constructor.
+     *
      * @param hostname hostname (ipv4, ipv6, dns name)
-     * @param port server port
+     * @param port     server port
      * @param database database name
      * @throws SQLException exception if connection failed
      */
@@ -313,7 +314,7 @@ public class MariaDbDataSource implements DataSource, ConnectionPoolDataSource, 
      * @since 1.4
      */
     public void setLogWriter(final PrintWriter out) throws SQLException {
-
+        //not implemented
     }
 
     /**
@@ -327,7 +328,7 @@ public class MariaDbDataSource implements DataSource, ConnectionPoolDataSource, 
      * @since 1.4
      */
     public int getLoginTimeout() throws SQLException {
-        return 0;
+        return urlParser.getOptions().connectTimeout == null ? 0 : urlParser.getOptions().connectTimeout;
     }
 
     /**
@@ -342,6 +343,7 @@ public class MariaDbDataSource implements DataSource, ConnectionPoolDataSource, 
      */
     @Override
     public void setLoginTimeout(final int seconds) throws SQLException {
+        urlParser.getOptions().connectTimeout = seconds;
     }
 
     /**
@@ -375,7 +377,7 @@ public class MariaDbDataSource implements DataSource, ConnectionPoolDataSource, 
      * @param iface a Class defining an interface.
      * @return true if this implements the interface or directly or indirectly wraps an object that does.
      * @throws SQLException if an error occurs while determining whether this is a wrapper for an object with
-     *                               the given interface.
+     *                      the given interface.
      * @since 1.6
      */
     public boolean isWrapperFor(final Class<?> iface) throws SQLException {
@@ -390,8 +392,8 @@ public class MariaDbDataSource implements DataSource, ConnectionPoolDataSource, 
      * connection to the database that this
      * <code>ConnectionPoolDataSource</code> object represents
      * @throws SQLException if a database access error occurs
-     *                               if the JDBC driver does not support
-     *                               this method
+     *                      if the JDBC driver does not support
+     *                      this method
      * @since 1.4
      */
     public PooledConnection getPooledConnection() throws SQLException {

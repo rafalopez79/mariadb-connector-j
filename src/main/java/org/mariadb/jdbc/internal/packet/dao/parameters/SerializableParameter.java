@@ -69,6 +69,7 @@ public class SerializableParameter implements ParameterHolder {
 
     /**
      * Write object to buffer for text protocol.
+     *
      * @param os the stream to write to
      * @throws IOException if error reading stream
      */
@@ -79,6 +80,7 @@ public class SerializableParameter implements ParameterHolder {
 
     /**
      * Write object to buffer for text protocol without checking buffer size.
+     *
      * @param os the stream to write to
      * @throws IOException if error reading stream
      */
@@ -121,6 +123,7 @@ public class SerializableParameter implements ParameterHolder {
 
     /**
      * Write data in binary format to buffer.
+     *
      * @param os buffer
      * @throws IOException exception
      */

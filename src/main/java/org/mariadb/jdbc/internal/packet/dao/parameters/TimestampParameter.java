@@ -49,9 +49,9 @@ OF SUCH DAMAGE.
 
 package org.mariadb.jdbc.internal.packet.dao.parameters;
 
-import org.mariadb.jdbc.internal.util.Options;
-import org.mariadb.jdbc.internal.stream.PacketOutputStream;
 import org.mariadb.jdbc.internal.MariaDbType;
+import org.mariadb.jdbc.internal.stream.PacketOutputStream;
+import org.mariadb.jdbc.internal.util.Options;
 
 import java.io.IOException;
 import java.sql.Timestamp;
@@ -67,10 +67,11 @@ public class TimestampParameter implements ParameterHolder, Cloneable {
 
     /**
      * Constructor.
-     * @param ts timestamps
-     * @param cal session calendar
+     *
+     * @param ts                timestamps
+     * @param cal               session calendar
      * @param fractionalSeconds must fractional Seconds be send to database.
-     * @param options session options
+     * @param options           session options
      */
     public TimestampParameter(Timestamp ts, Calendar cal, boolean fractionalSeconds, Options options) {
         this.ts = ts;
@@ -124,6 +125,7 @@ public class TimestampParameter implements ParameterHolder, Cloneable {
 
     /**
      * Write timeStamp in binary format without checking buffer size.
+     *
      * @param writeBuffer buffer to write
      */
     public void writeUnsafeBinary(PacketOutputStream writeBuffer) {

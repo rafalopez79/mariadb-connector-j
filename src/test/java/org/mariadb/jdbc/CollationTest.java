@@ -1,6 +1,7 @@
 package org.mariadb.jdbc;
 
 import org.junit.Assert;
+import org.junit.Assume;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -9,13 +10,12 @@ import java.io.StringReader;
 import java.nio.charset.Charset;
 import java.sql.*;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 public class CollationTest extends BaseTest {
     /**
      * Tables Initialisation.
+     *
      * @throws SQLException exception
      */
     @BeforeClass()
@@ -34,6 +34,8 @@ public class CollationTest extends BaseTest {
      */
     @Test
     public void emoji() throws SQLException {
+        //temporary. waiting for https://jira.mariadb.org/browse/MXS-953
+        Assume.assumeFalse("MAXSCALE".equals(System.getenv("TYPE")));
         Connection connection = null;
         try {
             connection = setConnection();
@@ -45,6 +47,7 @@ public class CollationTest extends BaseTest {
             rs = connection.createStatement().executeQuery(sqlForCharset);
             assertTrue(rs.next());
             String clientCharacterSet = rs.getString(1);
+
             if ("utf8mb4".equalsIgnoreCase(serverCharacterSet)) {
                 assertTrue(serverCharacterSet.equalsIgnoreCase(clientCharacterSet));
             } else {
@@ -72,6 +75,8 @@ public class CollationTest extends BaseTest {
      */
     @Test
     public void test4BytesUtf8() throws Exception {
+        //temporary. waiting for https://jira.mariadb.org/browse/MXS-953
+        Assume.assumeFalse("MAXSCALE".equals(System.getenv("TYPE")));
 
         String sqlForCharset = "select @@character_set_server";
         ResultSet rs = sharedConnection.createStatement().executeQuery(sqlForCharset);
@@ -144,11 +149,9 @@ public class CollationTest extends BaseTest {
     }
 
     /**
-     *
      * CONJ-369 : Writes and reads a clob (longtext) of a latin1 table.
      *
      * @throws java.sql.SQLException if connection error occur.
-     *
      */
     @Test
     public void insertAndSelectShouldBothUseLatin1Encoding() throws SQLException {

@@ -49,9 +49,8 @@ OF SUCH DAMAGE.
 */
 
 
-
-import org.mariadb.jdbc.internal.stream.PacketOutputStream;
 import org.mariadb.jdbc.internal.MariaDbType;
+import org.mariadb.jdbc.internal.stream.PacketOutputStream;
 
 import java.util.Calendar;
 

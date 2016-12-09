@@ -95,6 +95,7 @@ public class SharedMemorySocket extends Socket {
 
     /**
      * Create ShareMemorySocket.
+     *
      * @param name name
      * @throws IOException exception
      */
@@ -111,9 +112,10 @@ public class SharedMemorySocket extends Socket {
 
     /**
      * Map memory
+     *
      * @param mapName map name
-     * @param mode mode
-     * @param size size
+     * @param mode    mode
+     * @param size    size
      * @return Pointer
      */
     public static Pointer mapMemory(String mapName, int mode, int size) {
@@ -213,18 +215,23 @@ public class SharedMemorySocket extends Socket {
     }
 
     public void setTcpNoDelay(boolean b) {
+        //do nothing
     }
 
     public void setKeepAlive(boolean b) {
+        //do nothing
     }
 
     public void setReceiveBufferSize(int size) {
+        //do nothing
     }
 
     public void setSendBufferSize(int size) {
+        //do nothing
     }
 
     public void setSoLinger(boolean b, int i) {
+        //do nothing
     }
 
     public void setSoTimeout(int t) {
@@ -236,19 +243,19 @@ public class SharedMemorySocket extends Socket {
     }
 
     public void shutdownInput() {
+        //do nothing
     }
 
     public void shutdownOutput() {
+        //do nothing
     }
 
     @Override
     public void close() {
 
-        if (connectionClosed != null) {
+        if (connectionClosed != null && Kernel32.INSTANCE.WaitForSingleObject(connectionClosed, 0) != 0) {
             /* Set close event if not yet set */
-            if (Kernel32.INSTANCE.WaitForSingleObject(connectionClosed, 0) != 0) {
-                Kernel32.INSTANCE.SetEvent(connectionClosed);
-            }
+            Kernel32.INSTANCE.SetEvent(connectionClosed);
         }
         HANDLE[] handles = {serverRead, serverWrote, clientRead, clientWrote, connectionClosed};
         for (HANDLE h : handles) {

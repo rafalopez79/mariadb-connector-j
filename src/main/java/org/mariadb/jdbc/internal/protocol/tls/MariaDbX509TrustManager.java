@@ -58,9 +58,7 @@ import org.mariadb.jdbc.internal.util.dao.QueryException;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 import javax.net.ssl.X509TrustManager;
-
 import java.io.*;
-import java.net.URL;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.NoSuchAlgorithmException;
@@ -76,6 +74,7 @@ public class MariaDbX509TrustManager implements X509TrustManager {
 
     /**
      * MyX509TrustManager.
+     *
      * @param options parsed url options
      * @throws QueryException exception
      */
@@ -179,25 +178,27 @@ public class MariaDbX509TrustManager implements X509TrustManager {
 
     /**
      * Check client trusted.
+     *
      * @param x509Certificates certificate
-     * @param string string
+     * @param string           string
      * @throws CertificateException exception
      */
     @Override
     public void checkClientTrusted(X509Certificate[] x509Certificates, String string) throws CertificateException {
+        if (trustManager == null) return;
+        trustManager.checkClientTrusted(x509Certificates, string);
     }
 
     /**
      * Check server trusted.
+     *
      * @param x509Certificates certificate
-     * @param string string
+     * @param string           string
      * @throws CertificateException exception
      */
     @Override
     public void checkServerTrusted(X509Certificate[] x509Certificates, String string) throws CertificateException {
-        if (trustManager == null) {
-            return;
-        }
+        if (trustManager == null) return;
         trustManager.checkServerTrusted(x509Certificates, string);
     }
 

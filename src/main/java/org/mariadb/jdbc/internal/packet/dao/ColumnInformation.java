@@ -54,8 +54,6 @@ import org.mariadb.jdbc.internal.util.buffer.Buffer;
 import org.mariadb.jdbc.internal.util.constant.ColumnFlags;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.sql.Types;
 
@@ -98,10 +96,10 @@ public class ColumnInformation {
             4, 4, 4, 4, 0, 4, 0, 0,
             0, 0, 0, 0, 0, 0, 0, 0
     };
+    static int lazyPositionFromEnd = 0;
     Buffer buffer;
     private short charsetNumber;
     private long length;
-    private long fixlength;
     private MariaDbType type;
     private byte decimals;
     private short flags;
@@ -112,6 +110,7 @@ public class ColumnInformation {
 
     /**
      * Read column information from buffer.
+     *
      * @param buffer buffer
      */
     public ColumnInformation(Buffer buffer) {
@@ -133,13 +132,20 @@ public class ColumnInformation {
         2              filler [00] [00]
 
          */
-        buffer.skipLengthEncodedBytes();  /* catalog */
-        buffer.skipLengthEncodedBytes();  /* db */
-        buffer.skipLengthEncodedBytes();  /* table */
-        buffer.skipLengthEncodedBytes();  /* original table */
-        buffer.skipLengthEncodedBytes();  /* name */
-        buffer.skipLengthEncodedBytes();  /* org_name */
-        fixlength = buffer.readByte();
+        if (lazyPositionFromEnd == 0) {
+            buffer.skipLengthEncodedBytes();  /* catalog */
+            buffer.skipLengthEncodedBytes();  /* db */
+            buffer.skipLengthEncodedBytes();  /* table */
+            buffer.skipLengthEncodedBytes();  /* original table */
+            buffer.skipLengthEncodedBytes();  /* name */
+            buffer.skipLengthEncodedBytes();  /* org_name */
+            buffer.readByte(); //fixlength field
+            lazyPositionFromEnd = buffer.limit - buffer.position;
+        } else {
+            //permit to avoid reading the 6th String encode data, almost never needed
+            buffer.position = buffer.limit - lazyPositionFromEnd;
+        }
+
         charsetNumber = buffer.readShort();
         length = buffer.readInt();
         type = MariaDbType.fromServer(buffer.readByte() & 0xff);
@@ -158,6 +164,7 @@ public class ColumnInformation {
 
     /**
      * Constructor.
+     *
      * @param name column name
      * @param type column type
      * @return ColumnInformation
@@ -249,6 +256,7 @@ public class ColumnInformation {
 
     /**
      * Return metadata precision.
+     *
      * @return precision
      */
     public long getPrecision() {
@@ -271,6 +279,7 @@ public class ColumnInformation {
 
     /**
      * Get column size.
+     *
      * @return size
      */
     public int getDisplaySize() {
