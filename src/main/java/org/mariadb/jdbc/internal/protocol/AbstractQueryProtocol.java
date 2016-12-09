@@ -63,10 +63,7 @@ import org.mariadb.jdbc.internal.packet.result.EndOfFilePacket;
 import org.mariadb.jdbc.internal.packet.result.ErrorPacket;
 import org.mariadb.jdbc.internal.packet.send.SendChangeDbPacket;
 import org.mariadb.jdbc.internal.packet.send.SendPingPacket;
-import org.mariadb.jdbc.internal.queryresults.ExecutionResult;
-import org.mariadb.jdbc.internal.queryresults.MultiFixedIntExecutionResult;
-import org.mariadb.jdbc.internal.queryresults.MultiVariableIntExecutionResult;
-import org.mariadb.jdbc.internal.queryresults.SingleExecutionResult;
+import org.mariadb.jdbc.internal.queryresults.*;
 import org.mariadb.jdbc.internal.queryresults.resultset.MariaSelectResultSet;
 import org.mariadb.jdbc.internal.stream.MaxAllowedPacketException;
 import org.mariadb.jdbc.internal.stream.PacketOutputStream;
@@ -1108,7 +1105,8 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
                 while (moreResults && loadAllResults && executionResult.getFetchSize() == 0) {
                     //load additional results
                     executionResult.getCachedExecutionResults().add(getResult(executionResult, ResultSet.TYPE_FORWARD_ONLY,
-                            (activeStreamingResult != null) ? activeStreamingResult.isBinaryEncoded() : moreResultsTypeBinary, false, retrieveResultSetInserts));
+                            (activeStreamingResult != null) ? activeStreamingResult.isBinaryEncoded() : moreResultsTypeBinary, false,
+                            retrieveResultSetInserts));
                 }
                 break;
 
@@ -1191,21 +1189,19 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
                         ci[i] = new ColumnInformation(packetFetcher.getPacket());
                     }
 
-                    if ((serverCapabilities & MariaDbServerCapabilities.CLIENT_DEPRECATE_EOF) == 0) {
-                        //read EOF packet
-                        Buffer bufferEof = packetFetcher.getReusableBuffer();
-                        if (bufferEof.getByteAt(0) != Packet.EOF) {
-                            throw new QueryException("Packets out of order when reading field packets, expected was EOF stream. "
-                                    + "Packet contents (hex) = " + Utils.hexdump(bufferEof.buf, options.maxQuerySizeToLog, 0, buffer.position));
-                        } else if (executionResult.isCanHaveCallableResultSet() || checkCallableResultSet) {
-                            //Identify if this is a "callable OUT packet" (callableResult=true)
-                            //needed because :
-                            // - will permit for callableStatement to identify the output result packet
-                            // - after "OUT packet", an EOF/OK packet is send, but mysql send the "OUT packet with a bad "more result flag",
-                            //   so need to check that this is a "OUT packet" to known there is another packet.
-                            EndOfFilePacket endOfFilePacket = new EndOfFilePacket(bufferEof);
-                            callableResult = (endOfFilePacket.getStatusFlags() & ServerStatus.PS_OUT_PARAMETERS) != 0;
-                        }
+                    //read EOF packet
+                    Buffer bufferEof = packetFetcher.getReusableBuffer();
+                    if (bufferEof.getByteAt(0) != Packet.EOF) {
+                        throw new QueryException("Packets out of order when reading field packets, expected was EOF stream. "
+                                + "Packet contents (hex) = " + Utils.hexdump(bufferEof.buf, options.maxQuerySizeToLog, 0, buffer.position));
+                    } else if (executionResult.isCanHaveCallableResultSet() || checkCallableResultSet) {
+                        //Identify if this is a "callable OUT packet" (callableResult=true)
+                        //needed because :
+                        // - will permit for callableStatement to identify the output result packet
+                        // - after "OUT packet", an EOF/OK packet is send, but mysql send the "OUT packet with a bad "more result flag",
+                        //   so need to check that this is a "OUT packet" to known there is another packet.
+                        EndOfFilePacket endOfFilePacket = new EndOfFilePacket(bufferEof);
+                        callableResult = (endOfFilePacket.getStatusFlags() & ServerStatus.PS_OUT_PARAMETERS) != 0;
                     }
 
                     //fetch Select result
@@ -1213,35 +1209,38 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
                             binaryProtocol, resultSetScrollType, executionResult.getFetchSize(), callableResult);
                     mariaSelectResultset.initFetch();
 
-                    if (!executionResult.isSelectPossible()) {
-                        while (moreResults && loadAllResults && executionResult.getFetchSize() == 0) {
-                            try {
-                                getResult(executionResult, ResultSet.TYPE_FORWARD_ONLY,
-                                        (activeStreamingResult != null) ? activeStreamingResult.isBinaryEncoded() : moreResultsTypeBinary, false, retrieveResultSetInserts);
-                            } catch (QueryException e) {
-                            }
-                        }
-                        if (!executionResult.isCanHaveCallableResultSet() && !retrieveResultSetInserts) {
-                            throw new QueryException("Select command are not permitted via executeBatch() command");
-                        }
-                    }
-                    if (!loadAllResults) return new SingleExecutionResult(executionResult.getStatement(), 0, true, false, mariaSelectResultset);
                     if (retrieveResultSetInserts) {
+                        //
                         try {
-                            while (mariaSelectResultset.next()) {
-                                //TODO
-                            }
+                            ((MultiExecutionResult) executionResult).addResultSetStat(mariaSelectResultset, moreResults);
                         } catch (SQLException sqlerror) {
-                            //cannot occur, all rows are fetched
+                            throw new QueryException("Error reading Bulk result set");
                         }
                     } else {
-                        executionResult.addResultSet(mariaSelectResultset, moreResults);
-                    }
-
-                    //load additional results
-                    while (moreResults && loadAllResults && executionResult.getFetchSize() == 0) {
-                        executionResult.getCachedExecutionResults().add(getResult(executionResult, ResultSet.TYPE_FORWARD_ONLY,
-                                (activeStreamingResult != null) ? activeStreamingResult.isBinaryEncoded() : moreResultsTypeBinary, false, retrieveResultSetInserts));
+                        if (!executionResult.isSelectPossible()) {
+                            while (moreResults && loadAllResults && executionResult.getFetchSize() == 0) {
+                                try {
+                                    getResult(executionResult, ResultSet.TYPE_FORWARD_ONLY,
+                                            (activeStreamingResult != null) ? activeStreamingResult.isBinaryEncoded() : moreResultsTypeBinary, false,
+                                            retrieveResultSetInserts);
+                                } catch (QueryException e) {
+                                }
+                            }
+                            if (!executionResult.isCanHaveCallableResultSet() && !retrieveResultSetInserts) {
+                                throw new QueryException("Select command are not permitted via executeBatch() command");
+                            }
+                        }
+                        if (!loadAllResults) {
+                            return new SingleExecutionResult(executionResult.getStatement(), 0, true, false, mariaSelectResultset);
+                        } else {
+                            executionResult.addResultSet(mariaSelectResultset, moreResults);
+                            //load additional results
+                            while (moreResults && executionResult.getFetchSize() == 0) {
+                                executionResult.getCachedExecutionResults().add(getResult(executionResult, ResultSet.TYPE_FORWARD_ONLY,
+                                        (activeStreamingResult != null) ? activeStreamingResult.isBinaryEncoded() : moreResultsTypeBinary,
+                                        false, retrieveResultSetInserts));
+                            }
+                        }
                     }
 
                 } catch (IOException e) {

@@ -1,5 +1,9 @@
 package org.mariadb.jdbc.internal.queryresults;
 
+import org.mariadb.jdbc.internal.queryresults.resultset.MariaSelectResultSet;
+
+import java.sql.SQLException;
+
 public interface MultiExecutionResult extends ExecutionResult {
 
     int[] updateResultsForRewrite(int waitedSize, boolean hasException);
@@ -10,5 +14,6 @@ public interface MultiExecutionResult extends ExecutionResult {
 
     int getFirstAffectedRows();
 
+    void addResultSetStat(MariaSelectResultSet result, boolean moreResultAvailable) throws SQLException;
 }
 

@@ -370,33 +370,6 @@ public class MariaSelectResultSet implements ResultSet {
             }
             int remaining = length - 1;
 
-
-            if (read == 0 && !isBinaryEncoded) { //OK_packet
-                Buffer buffer = packetFetcher.getReusableBuffer(remaining, lastReusableArray);
-                buffer.getLengthEncodedBinary(); //affectedRows
-                buffer.getLengthEncodedBinary(); //insertId
-                short serverStatus = buffer.readShort();
-                protocol.setServerStatus(serverStatus);
-                protocol.setHasWarnings(buffer.readShort() > 0);
-                //force the more packet value when this is a callable output result.
-                //There is always a OK packet after a callable output result, but mysql 5.6-7
-                //is sending a bad "more result" flag (without setting more packet to true)
-                //so force the value, since this will corrupt connection.
-                boolean hasMoreResults = callableResult || (serverStatus & ServerStatus.MORE_RESULTS_EXISTS) != 0;
-                protocol.setMoreResults(hasMoreResults, isBinaryEncoded);
-
-                if (!hasMoreResults) {
-                    if (protocol.getActiveStreamingResult() == this) protocol.setActiveStreamingResult(null);
-                    protocol = null;
-                    packetFetcher = null;
-                    inputStream = null;
-                }
-                lastReusableArray = null;
-                readAllRows = true;
-                return false;
-
-            }
-
             if (read == 255) { //ERROR packet
                 protocol.setActiveStreamingResult(null);
                 Buffer buffer = packetFetcher.getReusableBuffer(remaining, lastReusableArray);
@@ -416,7 +389,7 @@ public class MariaSelectResultSet implements ResultSet {
                 protocol.setHasWarnings(((buffer.buf[0] & 0xff) + ((buffer.buf[1] & 0xff) << 8)) > 0);
 
                 //force the more packet value when this is a callable output result.
-                //There is always a OK packet after a callable output result, but mysql 5.6-7
+                //There is always a OK packet after a callable output result, but mysql until 5.7.5
                 //is sending a bad "more result" flag (without setting more packet to true)
                 //so force the value, since this will corrupt connection.
                 //corrected in MariaDB since MDEV-4604 (10.0.4, 5.5.32)

@@ -142,24 +142,18 @@ public class ComStmtPrepare {
                 }
 
                 if (numColumns > 0) {
-                    if ((serverCapabilities & MariaDbServerCapabilities.CLIENT_DEPRECATE_EOF) == 0) {
-                        protocol.skipEofPacket();
-                    }
+                    protocol.skipEofPacket();
                     for (int i = 0; i < numColumns; i++) {
                         columns[i] = new ColumnInformation(packetFetcher.getPacket());
                     }
                 }
-                if ((serverCapabilities & MariaDbServerCapabilities.CLIENT_DEPRECATE_EOF) == 0) {
-                    protocol.readEofPacket();
-                }
+                protocol.readEofPacket();
             } else {
                 if (numColumns > 0) {
                     for (int i = 0; i < numColumns; i++) {
                         columns[i] = new ColumnInformation(packetFetcher.getPacket());
                     }
-                    if ((serverCapabilities & MariaDbServerCapabilities.CLIENT_DEPRECATE_EOF) == 0) {
-                        protocol.readEofPacket();
-                    }
+                    protocol.readEofPacket();
                 } else {
                     //read warning only if no param / columns, because will be overwritten by EOF warning data
                     buffer.readByte(); // reserved

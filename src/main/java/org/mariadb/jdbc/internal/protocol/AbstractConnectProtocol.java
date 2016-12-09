@@ -480,7 +480,8 @@ public abstract class AbstractConnectProtocol implements Protocol {
             this.serverThreadId = greetingPacket.getServerThreadId();
             this.version = greetingPacket.getServerVersion();
             this.supportArrayBinding = (greetingPacket.getServerCapabilities() & MariaDbServerCapabilities.MARIADB_CLIENT_STMT_BULK_OPERATIONS) != 0;
-            this.checkCallableResultSet = this.version.indexOf("MariaDB") == -1;
+            //MariaDb version flag can be changed
+            this.checkCallableResultSet = !greetingPacket.isMariaDbAdditionalFlagSet() || this.version.indexOf("MariaDB") == -1;
             this.serverCapabilities = greetingPacket.getServerCapabilities();
             byte exchangeCharset = decideLanguage(greetingPacket.getServerLanguage());
             parseVersion();
@@ -590,8 +591,10 @@ public abstract class AbstractConnectProtocol implements Protocol {
                         | MariaDbServerCapabilities.CONNECT_ATTRS
                         | MariaDbServerCapabilities.PLUGIN_AUTH_LENENC_CLIENT_DATA
                         | MariaDbServerCapabilities.MARIADB_CLIENT_COM_MULTI
-                        | MariaDbServerCapabilities.MARIADB_CLIENT_STMT_BULK_OPERATIONS
-                        | MariaDbServerCapabilities.CLIENT_DEPRECATE_EOF;
+                        | MariaDbServerCapabilities.MARIADB_CLIENT_STMT_BULK_OPERATIONS;
+
+        //cannot use MariaDbServerCapabilities.CLIENT_DEPRECATE_EOF since driver need to know if resultSet is an output
+        // parameter of a stored procedure
 
         if (options.allowMultiQueries || (options.rewriteBatchedStatements)) {
             capabilities |= MariaDbServerCapabilities.MULTI_STATEMENTS;

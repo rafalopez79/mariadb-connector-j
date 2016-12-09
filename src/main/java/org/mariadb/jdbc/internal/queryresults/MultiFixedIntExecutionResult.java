@@ -58,6 +58,26 @@ public class MultiFixedIntExecutionResult implements MultiExecutionResult {
         this.setMoreResultAvailable(moreResultAvailable);
     }
 
+
+    /**
+     * Add Bulk load resultSet information.
+     *
+     * @param result              resultSet implementation
+     * @param moreResultAvailable is there additional packet
+     */
+    public void addResultSetStat(MariaSelectResultSet result, boolean moreResultAvailable) throws SQLException {
+        while (result.next()) {
+            long initialInsertId = result.getLong(1);
+            long length = result.getLong(2);
+            int autoIncrement = result.getInt(3);
+            for (int i = 0; i < length; i++) {
+                this.insertIds[currentStat] = initialInsertId + autoIncrement * i;
+                this.affectedRows[currentStat++] = Statement.SUCCESS_NO_INFO;
+            }
+        }
+        this.setMoreResultAvailable(moreResultAvailable);
+    }
+
     /**
      * Add execution statistics.
      *

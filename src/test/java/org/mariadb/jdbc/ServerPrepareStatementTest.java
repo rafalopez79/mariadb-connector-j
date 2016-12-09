@@ -913,6 +913,7 @@ public class ServerPrepareStatementTest extends BaseTest {
             }
         }
     }
+
     @Test
     public void testPacketSplit1() throws  SQLException {
         try (Connection connection = setConnection()) {

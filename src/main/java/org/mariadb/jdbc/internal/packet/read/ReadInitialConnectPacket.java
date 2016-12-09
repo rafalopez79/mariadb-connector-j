@@ -75,6 +75,7 @@ public class ReadInitialConnectPacket {
     private final byte[] seed;
     private String serverVersion;
     private String pluginName;
+    private boolean mariaDbAdditionalFlagSet;
 
     /**
      * Read database initial stream.
@@ -111,7 +112,7 @@ public class ReadInitialConnectPacket {
         //mariaDb additional capabilities.valid only if mariadb server.
         //has value since server 10.2 (was 0 before)
         long mariaDbAdditionalCapacities = buffer.readInt();
-
+        mariaDbAdditionalFlagSet = mariaDbAdditionalCapacities > 0;
         if ((serverCapabilities4FirstBytes & MariaDbServerCapabilities.SECURE_CONNECTION) != 0) {
             final byte[] seed2 = buffer.readRawBytes(saltLength);
             seed = Utils.copyWithLength(seed1, seed1.length + seed2.length);
@@ -129,16 +130,10 @@ public class ReadInitialConnectPacket {
         if ((serverCapabilities4FirstBytes & MariaDbServerCapabilities.PLUGIN_AUTH) != 0) {
             pluginName = buffer.readString(StandardCharsets.US_ASCII);
             if (serverVersion.startsWith(MARIADB_RPL_HACK_PREFIX)) {
-                serverCapabilities = (serverCapabilities4FirstBytes & 0xffffffffL) + (mariaDbAdditionalCapacities << 32);
                 serverVersion = serverVersion.substring(MARIADB_RPL_HACK_PREFIX.length());
-            } else {
-                serverCapabilities = serverCapabilities4FirstBytes & 0xffffffffL;
             }
-
-        } else {
-            serverCapabilities = serverCapabilities4FirstBytes & 0xffffffffL;
-
         }
+        serverCapabilities = (serverCapabilities4FirstBytes & 0xffffffffL) + (mariaDbAdditionalCapacities << 32);
     }
 
     @Override
@@ -186,5 +181,9 @@ public class ReadInitialConnectPacket {
 
     public String getPluginName() {
         return pluginName;
+    }
+
+    public boolean isMariaDbAdditionalFlagSet() {
+        return mariaDbAdditionalFlagSet;
     }
 }

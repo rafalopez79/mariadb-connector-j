@@ -175,10 +175,10 @@ public class ComStmtBulkExecute {
                         initialCounterOffset, writer, parametersList, statementId);
             }
             return -1;
-        } else
+        } else {
             return setIterationCountAndSend(protocol, executionResult, resultSetScrollType, counterOffset,
                     initialCounterOffset, writer, parametersList, statementId);
-
+        }
     }
 
     private static int setIterationCountAndSend(Protocol protocol, ExecutionResult executionResult, int resultSetScrollType,
