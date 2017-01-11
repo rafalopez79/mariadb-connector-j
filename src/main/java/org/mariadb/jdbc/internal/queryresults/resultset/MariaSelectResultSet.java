@@ -66,6 +66,7 @@ import org.mariadb.jdbc.internal.stream.MariaDbInputStream;
 import org.mariadb.jdbc.internal.util.ExceptionCode;
 import org.mariadb.jdbc.internal.util.ExceptionMapper;
 import org.mariadb.jdbc.internal.util.Options;
+import org.mariadb.jdbc.internal.util.Utils;
 import org.mariadb.jdbc.internal.util.buffer.Buffer;
 import org.mariadb.jdbc.internal.util.constant.ServerStatus;
 
@@ -390,7 +391,7 @@ public class MariaSelectResultSet implements ResultSet {
 
             int read = inputStream.read() & 0xff;
             if (logger.isTraceEnabled()) {
-                logger.trace("read packet data(part):0x" + Integer.valueOf(String.valueOf(read), 16));
+                logger.trace("read packet data(part):0x" + Utils.hexdump(new byte[] {(byte) read}));
             }
             int remaining = length - 1;
 
@@ -412,24 +413,49 @@ public class MariaSelectResultSet implements ResultSet {
                 }
             }
 
-            if (read == 254 && remaining < 9) { //EOF packet
-                Buffer buffer = packetFetcher.getReusableBuffer(remaining, lastReusableArray);
-                protocol.setHasWarnings(((buffer.buf[0] & 0xff) + ((buffer.buf[1] & 0xff) << 8)) > 0);
+            if (read == 254) {
 
-                //force the more packet value when this is a callable output result.
-                //There is always a OK packet after a callable output result, but mysql 5.6-7
-                //is sending a bad "more result" flag (without setting more packet to true)
-                //so force the value, since this will corrupt connection.
-                //corrected in MariaDB since MDEV-4604 (10.0.4, 5.5.32)
-                protocol.setMoreResults(callableResult
-                        || (((buffer.buf[2] & 0xff) + ((buffer.buf[3] & 0xff) << 8)) & ServerStatus.MORE_RESULTS_EXISTS) != 0);
-                isEof = true;
-                if (!protocol.hasMoreResults()) protocol.removeActiveStreamingResult();
-                protocol = null;
-                packetFetcher = null;
-                inputStream = null;
-                lastReusableArray = null;
-                return false;
+                if (protocol.isEofDeprecated() || (!protocol.isEofDeprecated() && remaining < 9)) {
+
+                    int serverStatus;
+                    boolean hasWarning;
+                    Buffer buffer = packetFetcher.getReusableBuffer(remaining, lastReusableArray);
+
+                    if (protocol.isEofDeprecated()) { //OK packet with 0xFE header
+
+                        buffer.skipLengthEncodedBytes(); // affected rows
+                        buffer.skipLengthEncodedBytes(); // last insert id
+                        serverStatus = buffer.readShort();
+                        hasWarning = buffer.readShort() > 0;
+
+                        callableResult = (serverStatus & ServerStatus.PS_OUT_PARAMETERS) != 0;
+                        protocol.setMoreResults((serverStatus & ServerStatus.MORE_RESULTS_EXISTS) != 0);
+
+                    } else { //Old EOF_Packet
+
+                        hasWarning = ((buffer.buf[0] & 0xff) + ((buffer.buf[1] & 0xff) << 8)) > 0;
+                        serverStatus = ((buffer.buf[2] & 0xff) + ((buffer.buf[3] & 0xff) << 8));
+
+                        if (!callableResult) callableResult = (serverStatus & ServerStatus.PS_OUT_PARAMETERS) != 0;
+
+                        //force the more packet value when this is a callable output result.
+                        //There is always a OK packet after a callable output result, but mysql 5.6-7
+                        //is sending a bad "more result" flag (without setting more packet to true)
+                        //so force the value, since this will corrupt connection.
+                        //corrected in MariaDB since MDEV-4604 (10.0.4, 5.5.32)
+                        protocol.setMoreResults(callableResult
+                                || (serverStatus & ServerStatus.MORE_RESULTS_EXISTS) != 0);
+                    }
+
+                    protocol.setHasWarnings(hasWarning);
+                    isEof = true;
+                    if (!protocol.hasMoreResults()) protocol.removeActiveStreamingResult();
+                    protocol = null;
+                    packetFetcher = null;
+                    inputStream = null;
+                    lastReusableArray = null;
+                    return false;
+                }
             }
 
             values.add(rowPacket.getRow(packetFetcher, inputStream, remaining, read));
@@ -458,19 +484,46 @@ public class MariaSelectResultSet implements ResultSet {
             }
         }
 
-        //is EOF stream
-        if ((buffer.getByteAt(0) == Packet.EOF && buffer.limit < 9)) {
-            isEof = true;
-            protocol.setHasWarnings(((buffer.buf[1] & 0xff) + ((buffer.buf[2] & 0xff) << 8)) > 0);
-            protocol.setMoreResults(callableResult
-                    || (((buffer.buf[3] & 0xff) + ((buffer.buf[4] & 0xff) << 8)) & ServerStatus.MORE_RESULTS_EXISTS) != 0);
-            if (!protocol.hasMoreResults()) protocol.removeActiveStreamingResult();
-            protocol = null;
-            packetFetcher = null;
-            inputStream = null;
-            lastReusableArray = null;
-            return false;
+        if (buffer.getByteAt(0) == Packet.EOF) {
+
+            if (protocol.isEofDeprecated() || (!protocol.isEofDeprecated() && buffer.limit < 9)) {
+
+                int serverStatus;
+                boolean hasWarning;
+
+                if (protocol.isEofDeprecated()) { //OK packet with 0xFE header
+                    buffer.skipByte(); //OK_PACKET header
+                    buffer.skipLengthEncodedBytes(); // affected rows
+                    buffer.skipLengthEncodedBytes(); // last insert id
+                    serverStatus = buffer.readShort();
+                    hasWarning = buffer.readShort() > 0;
+                    callableResult = (serverStatus & ServerStatus.PS_OUT_PARAMETERS) != 0;
+                    protocol.setMoreResults(callableResult || (serverStatus & ServerStatus.MORE_RESULTS_EXISTS) != 0);
+
+                } else {  //Old EOF_Packe
+                    hasWarning = ((buffer.buf[1] & 0xff) + ((buffer.buf[2] & 0xff) << 8)) > 0;
+                    serverStatus = ((buffer.buf[3] & 0xff) + ((buffer.buf[4] & 0xff) << 8));
+                    if (!callableResult) callableResult = (serverStatus & ServerStatus.PS_OUT_PARAMETERS) != 0;
+
+                    //force the more packet value when this is a callable output result.
+                    //There is always a OK packet after a callable output result, but mysql 5.6-7
+                    //is sending a bad "more result" flag (without setting more packet to true)
+                    //so force the value, since this will corrupt connection.
+                    //corrected in MariaDB since MDEV-4604 (10.0.4, 5.5.32)
+                    protocol.setMoreResults(callableResult || (serverStatus & ServerStatus.MORE_RESULTS_EXISTS) != 0);
+                }
+
+                isEof = true;
+                protocol.setHasWarnings(hasWarning);
+                if (!protocol.hasMoreResults()) protocol.removeActiveStreamingResult();
+                protocol = null;
+                packetFetcher = null;
+                inputStream = null;
+                lastReusableArray = null;
+                return false;
+            }
         }
+
         values.add(rowPacket.getRow(packetFetcher, buffer));
         return true;
     }

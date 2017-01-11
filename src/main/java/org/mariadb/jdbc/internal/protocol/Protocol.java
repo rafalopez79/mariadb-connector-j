@@ -250,4 +250,6 @@ public interface Protocol {
     void changeSocketSoTimeout(int setSoTimeout) throws SocketException;
 
     void removeActiveStreamingResult();
+
+    boolean isEofDeprecated();
 }

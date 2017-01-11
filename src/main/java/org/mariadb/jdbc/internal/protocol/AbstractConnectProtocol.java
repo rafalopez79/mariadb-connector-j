@@ -110,12 +110,10 @@ public abstract class AbstractConnectProtocol implements Protocol {
     protected final Options options;
     private final String username;
     private final String password;
-    public boolean moreResultsTypeBinary = false;
     public boolean hasWarnings = false;
     public Results activeStreamingResult = null;
     public int dataTypeMappingFlags;
     public short serverStatus;
-    protected boolean checkCallableResultSet;
     protected Socket socket;
     protected PacketOutputStream writer;
     protected boolean readOnly = false;
@@ -128,6 +126,7 @@ public abstract class AbstractConnectProtocol implements Protocol {
     protected long serverThreadId;
     protected ServerPrepareStatementCache serverPrepareStatementCache;
     protected boolean moreResults = false;
+    protected long serverCapabilities;
     private boolean hostFailed;
     private String version;
     private int majorVersion;
@@ -444,6 +443,10 @@ public abstract class AbstractConnectProtocol implements Protocol {
         // after setting autocommit, we can rely on serverStatus value
         String sessionOption = "autocommit=1";
 
+        if ((serverCapabilities & MariaDbServerCapabilities.CLIENT_SESSION_TRACK) != 0) {
+            sessionOption += ", session_track_schema=1";
+        }
+
         if (options.jdbcCompliantTruncation) {
             if (serverData.get("sql_mode") == null || "".equals(serverData.get("sql_mode"))) {
                 sessionOption += ",sql_mode='STRICT_TRANS_TABLES'";
@@ -470,11 +473,10 @@ public abstract class AbstractConnectProtocol implements Protocol {
             final ReadInitialConnectPacket greetingPacket = new ReadInitialConnectPacket(packetFetcher);
             this.serverThreadId = greetingPacket.getServerThreadId();
             this.version = greetingPacket.getServerVersion();
-            this.checkCallableResultSet = this.version.indexOf("MariaDB") == -1;
-
+            this.serverCapabilities = greetingPacket.getServerCapabilities();
             byte exchangeCharset = decideLanguage(greetingPacket.getServerLanguage());
             parseVersion();
-            long clientCapabilities = initializeClientCapabilities(greetingPacket.getServerCapabilities());
+            long clientCapabilities = initializeClientCapabilities(serverCapabilities);
 
             byte packetSeq = 1;
             if (options.useSsl && (greetingPacket.getServerCapabilities() & MariaDbServerCapabilities.SSL) != 0) {
@@ -579,7 +581,12 @@ public abstract class AbstractConnectProtocol implements Protocol {
                 | MariaDbServerCapabilities.PLUGIN_AUTH
                 | MariaDbServerCapabilities.CONNECT_ATTRS
                 | MariaDbServerCapabilities.PLUGIN_AUTH_LENENC_CLIENT_DATA
-                | MariaDbServerCapabilities.MARIADB_CLIENT_COM_MULTI;
+                | MariaDbServerCapabilities.MARIADB_CLIENT_COM_MULTI
+                | MariaDbServerCapabilities.CLIENT_SESSION_TRACK;
+
+        if ((serverCapabilities & MariaDbServerCapabilities.CLIENT_DEPRECATE_EOF) != 0) {
+            capabilities |= MariaDbServerCapabilities.CLIENT_DEPRECATE_EOF;
+        }
 
         if (options.allowMultiQueries || (options.rewriteBatchedStatements)) {
             capabilities |= MariaDbServerCapabilities.MULTI_STATEMENTS;
@@ -1123,6 +1130,10 @@ public abstract class AbstractConnectProtocol implements Protocol {
 
     public void changeSocketSoTimeout(int setSoTimeout) throws SocketException {
         socket.setSoTimeout(setSoTimeout);
+    }
+
+    public boolean isEofDeprecated() {
+        return (serverCapabilities & MariaDbServerCapabilities.CLIENT_DEPRECATE_EOF) != 0;
     }
 
 }

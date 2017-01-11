@@ -69,7 +69,7 @@ public class AsyncMultiRead implements Callable<AsyncMultiReadResult> {
 
         if (readPrepareStmtResult) {
             try {
-                asyncMultiReadResult.setPrepareResult(comStmtPrepare.read(protocol.getPacketFetcher()));
+                asyncMultiReadResult.setPrepareResult(comStmtPrepare.read(protocol.getPacketFetcher(), protocol.isEofDeprecated()));
             } catch (SQLException queryException) {
                 asyncMultiReadResult.setException(queryException);
             }

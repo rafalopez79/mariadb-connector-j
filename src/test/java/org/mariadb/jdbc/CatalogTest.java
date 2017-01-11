@@ -2,6 +2,7 @@ package org.mariadb.jdbc;
 
 import org.junit.Test;
 
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -46,10 +47,22 @@ public class CatalogTest extends BaseTest {
             Statement stmt = sharedConnection.createStatement();
             stmt.execute("drop database if exists " + MariaDbConnection.quoteIdentifier(name));
             stmt.execute("create database " + MariaDbConnection.quoteIdentifier(name));
+
             sharedConnection.setCatalog(name);
             assertEquals(name, sharedConnection.getCatalog());
+
+            if (minVersion(10, 2)) {
+                //since 10.2 schema change are send back to client even
+                //when setCatalog isn't used
+                stmt.execute("USE " + MariaDbConnection.quoteIdentifier(database));
+                assertEquals(database, sharedConnection.getCatalog());
+                stmt.execute("USE " + MariaDbConnection.quoteIdentifier(name));
+                assertEquals(name, sharedConnection.getCatalog());
+            }
+
             stmt.execute("drop database if exists " + MariaDbConnection.quoteIdentifier(name));
             stmt.close();
+
             sharedConnection.setCatalog(database);
         }
     }

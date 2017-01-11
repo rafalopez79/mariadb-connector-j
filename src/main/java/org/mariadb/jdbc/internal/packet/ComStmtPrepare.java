@@ -102,11 +102,12 @@ public class ComStmtPrepare {
      * Read COM_PREPARE_RESULT.
      *
      * @param packetFetcher inputStream
+     * @param eofDeprecated eof packetDeprecated
      * @return ServerPrepareResult prepare result
      * @throws IOException    is connection has error
      * @throws SQLException if server answer with error.
      */
-    public ServerPrepareResult read(ReadPacketFetcher packetFetcher) throws IOException, SQLException {
+    public ServerPrepareResult read(ReadPacketFetcher packetFetcher, boolean eofDeprecated) throws IOException, SQLException {
         Buffer buffer = packetFetcher.getReusableBuffer();
         byte firstByte = buffer.getByteAt(0);
 
@@ -139,18 +140,18 @@ public class ComStmtPrepare {
                 }
 
                 if (numColumns > 0) {
-                    protocol.skipEofPacket();
+                    if (!eofDeprecated) protocol.skipEofPacket();
                     for (int i = 0; i < numColumns; i++) {
                         columns[i] = new ColumnInformation(packetFetcher.getPacket());
                     }
                 }
-                protocol.readEofPacket();
+                if (!eofDeprecated) protocol.readEofPacket();
             } else {
                 if (numColumns > 0) {
                     for (int i = 0; i < numColumns; i++) {
                         columns[i] = new ColumnInformation(packetFetcher.getPacket());
                     }
-                    protocol.readEofPacket();
+                    if (!eofDeprecated) protocol.readEofPacket();
                 } else {
                     //read warning only if no param / columns, because will be overwritten by EOF warning data
                     buffer.readByte(); // reserved

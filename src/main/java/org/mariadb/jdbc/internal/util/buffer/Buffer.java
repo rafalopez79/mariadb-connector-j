@@ -89,6 +89,22 @@ public class Buffer {
         return new String(byteArrBuff, 0, cnt, charset);
     }
 
+
+    /**
+     * Get next binary data length.
+     *
+     * @return length of next binary data
+     */
+    public String readLengthEncodedString(final Charset charset) {
+
+        if (remaining() <= 0) return "";
+        final int length = (int) getLengthEncodedBinary();
+        String st = new String(buf, position, length, charset);
+        position += length;
+        return st;
+
+    }
+
     /**
      * Read a short (2 bytes) from the buffer.
      *
@@ -224,9 +240,8 @@ public class Buffer {
      * Get next data bytes with unknown length.
      *
      * @return the raw binary data
-     * @throws IOException if connection problem occur
      */
-    public byte[] getLengthEncodedBytes() throws IOException {
+    public byte[] getLengthEncodedBytes() {
         if (remaining() <= 0) {
             return new byte[0];
         }

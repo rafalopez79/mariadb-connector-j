@@ -54,6 +54,7 @@ import org.mariadb.jdbc.LocalInfileInterceptor;
 import org.mariadb.jdbc.MariaDbConnection;
 import org.mariadb.jdbc.MariaDbStatement;
 import org.mariadb.jdbc.UrlParser;
+import org.mariadb.jdbc.internal.MariaDbServerCapabilities;
 import org.mariadb.jdbc.internal.MariaDbType;
 import org.mariadb.jdbc.internal.packet.*;
 import org.mariadb.jdbc.internal.packet.dao.ColumnInformation;
@@ -70,6 +71,7 @@ import org.mariadb.jdbc.internal.util.ExceptionMapper;
 import org.mariadb.jdbc.internal.util.Utils;
 import org.mariadb.jdbc.internal.util.buffer.Buffer;
 import org.mariadb.jdbc.internal.util.constant.ServerStatus;
+import org.mariadb.jdbc.internal.util.constant.SessionChangeType;
 import org.mariadb.jdbc.internal.util.dao.ClientPrepareResult;
 import org.mariadb.jdbc.internal.util.dao.PrepareResult;
 import org.mariadb.jdbc.internal.util.dao.ServerPrepareResult;
@@ -333,7 +335,7 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
             writer.startPacket(0, true);
             ComStmtPrepare comStmtPrepare = new ComStmtPrepare(this, sql);
             comStmtPrepare.send(writer);
-            ServerPrepareResult result = comStmtPrepare.read(packetFetcher);
+            ServerPrepareResult result = comStmtPrepare.read(packetFetcher, isEofDeprecated());
 
             return result;
 
@@ -553,7 +555,7 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
                 comStmtPrepare.send(writer);
 
                 //read prepare result
-                serverPrepareResult = comStmtPrepare.read(getPacketFetcher());
+                serverPrepareResult = comStmtPrepare.read(getPacketFetcher(), isEofDeprecated());
                 statementId = serverPrepareResult.getStatementId();
                 parameterCount = serverPrepareResult.getParameters().length;
 
@@ -1152,6 +1154,20 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
         this.hasWarnings = (buffer.readShort() > 0);
         this.moreResults = ((serverStatus & ServerStatus.MORE_RESULTS_EXISTS) != 0);
 
+        if ((serverCapabilities & MariaDbServerCapabilities.CLIENT_SESSION_TRACK) != 0
+                && (serverStatus & ServerStatus.SERVER_SESSION_STATE_CHANGED) != 0) {
+            buffer.skipLengthEncodedBytes(); //info
+            Buffer sessionStateInfoBuffer = new Buffer(buffer.getLengthEncodedBytes());
+            while (sessionStateInfoBuffer.remaining() > 0) {
+                if (sessionStateInfoBuffer.readByte() == SessionChangeType.SESSION_TRACK_SCHEMA) {
+                    //schema has changed
+                    sessionStateInfoBuffer.getLengthEncodedBinary(); //entity length
+                    database = sessionStateInfoBuffer.readLengthEncodedString(StandardCharsets.UTF_8);
+                } else {
+                    sessionStateInfoBuffer.skipLengthEncodedBytes();
+                }
+            }
+        }
         results.addStats(updateCount, insertId, moreResults);
     }
 
@@ -1252,15 +1268,17 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
             // - Call query will have an callable resultSet for OUT parameters
             //   -> this resultSet must be identified and not listed in JDBC statement.getResultSet()
             // - after a callable resultSet, a OK packet is send, but mysql does send the  a bad "more result flag",
-            //so this flag is absolutely needed ! capability CLIENT_DEPRECATE_EOF must never be implemented.
-            Buffer bufferEof = packetFetcher.getReusableBuffer();
-            if (bufferEof.readByte() != Packet.EOF) {
-                throw new SQLException("Packets out of order when reading field packets, expected was EOF stream. "
-                        + "Packet contents (hex) = " + Utils.hexdump(bufferEof.buf, options.maxQuerySizeToLog, 0, buffer.position));
+            //so this flag is absolutely needed !
+            boolean callableResult = false;
+            if (!isEofDeprecated()) {
+                Buffer bufferEof = packetFetcher.getReusableBuffer();
+                if (bufferEof.readByte() != Packet.EOF) {
+                    throw new SQLException("Packets out of order when reading field packets, expected was EOF stream. "
+                            + "Packet contents (hex) = " + Utils.hexdump(bufferEof.buf, options.maxQuerySizeToLog, 0, buffer.position));
+                }
+                buffer.skipBytes(2); //Skip warningCount
+                callableResult = (buffer.readShort() & ServerStatus.PS_OUT_PARAMETERS) != 0;
             }
-            buffer.skipBytes(2); //Skip warningCount
-            boolean callableResult = (buffer.readShort() & ServerStatus.PS_OUT_PARAMETERS) != 0;
-
 
             //read resultSet
             MariaSelectResultSet mariaSelectResultset = new MariaSelectResultSet(ci, results, this, packetFetcher, callableResult);
