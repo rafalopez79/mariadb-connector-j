@@ -84,10 +84,12 @@ public class StreamParameter implements Cloneable, ParameterHolder {
      */
     public void writeTo(final PacketOutputStream pos) throws IOException {
         pos.write(BINARY_INTRODUCER);
-        if (length == Long.MAX_VALUE) {
-            pos.write(is, true, noBackslashEscapes);
-        } else {
-            pos.write(is, length, true, noBackslashEscapes);
+        if (is != null) {
+            if (length == Long.MAX_VALUE) {
+                pos.write(is, true, noBackslashEscapes);
+            } else {
+                pos.write(is, length, true, noBackslashEscapes);
+            }
         }
         pos.write(QUOTE);
 
@@ -110,10 +112,12 @@ public class StreamParameter implements Cloneable, ParameterHolder {
      * @throws IOException if socket error occur
      */
     public void writeBinary(final PacketOutputStream pos) throws IOException {
-        if (length == Long.MAX_VALUE) {
-            pos.write(is, false, noBackslashEscapes);
-        } else {
-            pos.write(is, length, false, noBackslashEscapes);
+        if (is != null) {
+            if (length == Long.MAX_VALUE) {
+                pos.write(is, false, noBackslashEscapes);
+            } else {
+                pos.write(is, length, false, noBackslashEscapes);
+            }
         }
     }
 
@@ -128,7 +132,7 @@ public class StreamParameter implements Cloneable, ParameterHolder {
 
 
     public boolean isNullData() {
-        return false;
+        return is == null;
     }
 
     public boolean isLongData() {

@@ -251,5 +251,10 @@ public class CmdInformationMultiple implements CmdInformation {
         return true;
     }
 
+    @Override
+    public void addBulkResult(SelectResultSet resultSet) {
+        //not possible
+    }
+
 }
 

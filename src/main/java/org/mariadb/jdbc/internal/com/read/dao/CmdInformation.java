@@ -50,6 +50,7 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 OF SUCH DAMAGE.
 */
 
+import org.mariadb.jdbc.internal.com.read.resultset.SelectResultSet;
 import org.mariadb.jdbc.internal.protocol.Protocol;
 
 import java.sql.ResultSet;
@@ -84,5 +85,7 @@ public interface CmdInformation {
     boolean moreResults();
 
     boolean isCurrentUpdateCount();
+
+    void addBulkResult(SelectResultSet resultSet);
 
 }

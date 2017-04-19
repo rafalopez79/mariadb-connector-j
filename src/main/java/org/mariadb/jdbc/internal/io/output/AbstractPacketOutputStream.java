@@ -77,6 +77,9 @@ public abstract class AbstractPacketOutputStream extends FilterOutputStream impl
     protected boolean permitTrace;
     protected int seqNo = 0;
     protected String serverThreadLog = "";
+    protected int mark;
+    protected byte[] markHeader;
+    protected int sendCmd = 0;
 
     /**
      * Common feature to write data into socket, creating MySQL Packet.
@@ -376,6 +379,7 @@ public abstract class AbstractPacketOutputStream extends FilterOutputStream impl
      * @throws IOException if socket error occur.
      */
     public void write(int value) throws IOException {
+
         if (pos >= buf.length) {
             if (pos >= getMaxPacketLength()) {
                 //buffer is more than a Packet, must flushBuffer()
@@ -703,4 +707,15 @@ public abstract class AbstractPacketOutputStream extends FilterOutputStream impl
         this.serverThreadLog = " conn:" + serverThreadId + ((isMaster != null) ? "(" + (isMaster ? "M" : "S") + ")" : "");
     }
 
+    public void mark() {
+        mark = pos;
+    }
+
+    public int getSendCmd() {
+        return sendCmd;
+    }
+
+    public int getSendCmdDecrement() {
+        return sendCmd--;
+    }
 }

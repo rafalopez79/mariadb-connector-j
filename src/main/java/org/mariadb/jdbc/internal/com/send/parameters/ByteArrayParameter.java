@@ -72,13 +72,17 @@ public class ByteArrayParameter implements Cloneable, ParameterHolder {
      * @throws IOException if socket error occur
      */
     public void writeTo(final PacketOutputStream pos) throws IOException {
+        if (bytes == null) {
+            pos.write(NullParameter.NULL);
+            return;
+        }
         pos.write(BINARY_INTRODUCER);
         pos.writeBytesEscaped(bytes, bytes.length, noBackslashEscapes);
         pos.write(QUOTE);
     }
 
     public long getApproximateTextProtocolLength() {
-        return bytes.length * 2;
+        return bytes == null ? 4 : bytes.length * 2;
     }
 
     /**
@@ -98,6 +102,7 @@ public class ByteArrayParameter implements Cloneable, ParameterHolder {
 
     @Override
     public String toString() {
+        if (bytes == null) return "null";
         if (bytes.length > 1024) {
             return "<bytearray:" + new String(Arrays.copyOfRange(bytes, 0, 1024)) + "...>";
         } else {
@@ -106,7 +111,7 @@ public class ByteArrayParameter implements Cloneable, ParameterHolder {
     }
 
     public boolean isNullData() {
-        return false;
+        return bytes == null;
     }
 
     public boolean isLongData() {

@@ -20,7 +20,7 @@ This particular MariaDB Client for Java file is work
 derived from a Drizzle-JDBC. Drizzle-JDBC file which is covered by subject to
 the following copyright and notice provisions:
 
-Copyright (c) 2009-2011, Marcus Eriksson
+Copyright (c) 2009-2011, Marcus Eriksson , Stephane Giron
 
 Redistribution and use in source and binary forms, with or without modification,
 are permitted provided that the following conditions are met:
@@ -47,59 +47,72 @@ ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSI
 OF SUCH DAMAGE.
 */
 
-package org.mariadb.jdbc.internal.com.send.parameters;
+package org.mariadb.jdbc.internal.com.send;
 
 import org.mariadb.jdbc.internal.ColumnType;
+import org.mariadb.jdbc.internal.com.Packet;
+import org.mariadb.jdbc.internal.com.read.dao.Results;
+import org.mariadb.jdbc.internal.com.send.parameters.ParameterHolder;
 import org.mariadb.jdbc.internal.io.output.PacketOutputStream;
+import org.mariadb.jdbc.internal.protocol.Protocol;
 
 import java.io.IOException;
+import java.sql.SQLException;
+import java.util.Iterator;
+import java.util.List;
 
-
-public class NullParameter implements ParameterHolder, Cloneable {
-    public static final byte[] NULL = {'N', 'U', 'L', 'L'};
-    private ColumnType type;
-
-    public NullParameter() {
-        type = ColumnType.NULL;
-    }
-
-    public NullParameter(ColumnType type) {
-        this.type = type;
-    }
-
-    public void writeTo(final PacketOutputStream os) throws IOException {
-        os.write(NULL);
-    }
-
-
-    public long getApproximateTextProtocolLength() {
-        return 4;
-    }
+public class ComStmtBulk {
 
     /**
-     * Write data to socket in binary format.
+     * Write COM_STMT_EXECUTE sub-command to output buffer.
      *
-     * @param pos socket output stream
+     * @param statementId           prepareResult object received after preparation.
+     * @param parametersList        parameters
+     * @param parameterCount        parameters number
+     * @param pos                   outputStream
+     * @throws IOException if a connection error occur
      */
-    public void writeBinary(final PacketOutputStream pos) {
-        //null data are not send in binary format.
-    }
+    public static void writeCmd(final int statementId, final List<ParameterHolder[]> parametersList, final int parameterCount,
+                                final PacketOutputStream pos, Protocol protocol, Results results) throws IOException, SQLException {
+        pos.startPacket(0);
+        pos.write(Packet.COM_STMT_BULK_EXECUTE);
+        pos.writeInt(statementId);
+        short bulkFlags = 192; //Return generated auto-increment IDs + Send types to server
+        pos.writeShort(bulkFlags);
 
-    public ColumnType getColumnType() {
-        return type;
-    }
+        Iterator<ParameterHolder[]> it = parametersList.iterator();
+        ParameterHolder[] holders = it.next();
+        ColumnType[] parameterTypeHeader = new ColumnType[holders.length];
 
-    @Override
-    public String toString() {
-        return "<null>";
-    }
+        //validate parameter set
+        if (parameterCount != -1 && parameterCount < holders.length) {
+            throw new SQLException("Parameter at position " + (parameterCount - 1) + " is not set", "07004");
+        }
 
-    public boolean isNullData() {
-        return true;
-    }
+        //send type
+        for (int i = 0; i < parameterCount; i++) {
+            parameterTypeHeader[i] = holders[i].getColumnType();
+            pos.writeShort((short) parameterTypeHeader[i].getType());
+        }
 
-    public boolean isLongData() {
-        return false;
+        while (true) {
+            for (int i = 0; i < parameterCount; i++) {
+                ParameterHolder holder = holders[i];
+                if (holder.isNullData()) {
+                    pos.write((byte) 1);
+                } else {
+                    pos.write((byte) 0);
+                    holder.writeBinary(pos);
+                }
+            }
+            if (!it.hasNext()) break;
+            holders = it.next();
+        }
+        pos.flush();
+
+        //read result
+        protocol.getResult(results, true);
+
     }
 
 }

@@ -62,11 +62,15 @@ public class BigDecimalParameter implements Cloneable, ParameterHolder {
     }
 
     public void writeTo(PacketOutputStream pos) throws IOException {
+        if (bigDecimal == null) {
+            pos.write(NullParameter.NULL);
+            return;
+        }
         pos.write(bigDecimal.toPlainString().getBytes());
     }
 
     public long getApproximateTextProtocolLength() {
-        return bigDecimal.toPlainString().getBytes().length;
+        return bigDecimal == null ? 4 : bigDecimal.toPlainString().getBytes().length;
     }
 
     /**
@@ -87,11 +91,11 @@ public class BigDecimalParameter implements Cloneable, ParameterHolder {
 
     @Override
     public String toString() {
-        return bigDecimal.toString();
+        return bigDecimal == null ? "null" : bigDecimal.toString();
     }
 
     public boolean isNullData() {
-        return false;
+        return bigDecimal == null;
     }
 
     public boolean isLongData() {

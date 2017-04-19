@@ -84,6 +84,10 @@ public class TimestampParameter implements Cloneable, ParameterHolder {
      * @param pos the stream to write to
      */
     public void writeTo(final PacketOutputStream pos) throws IOException {
+        if (ts == null) {
+            pos.write(NullParameter.NULL);
+            return;
+        }
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         sdf.setTimeZone(timeZone);
 
@@ -138,11 +142,11 @@ public class TimestampParameter implements Cloneable, ParameterHolder {
 
     @Override
     public String toString() {
-        return "'" + ts.toString() + "'";
+        return ts == null ? "null" : "'" + ts.toString() + "'";
     }
 
     public boolean isNullData() {
-        return false;
+        return ts == null;
     }
 
     public boolean isLongData() {

@@ -69,6 +69,7 @@ public class Packet {
     public static final byte COM_STMT_FETCH = (byte) 0x1c;
     public static final byte COM_STMT_SEND_LONG_DATA = (byte) 0x18;
     public static final byte COM_STMT_CLOSE = (byte) 0x19;
+    public static final byte COM_STMT_BULK_EXECUTE = (byte) 250;
     public static final byte COM_MULTI = (byte) 0xfe;
 
     //prepare statement cursor flag.

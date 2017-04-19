@@ -54,6 +54,7 @@ import org.mariadb.jdbc.internal.util.Utils;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
 
 public class StandardPacketOutputStream extends AbstractPacketOutputStream {
 
@@ -73,6 +74,9 @@ public class StandardPacketOutputStream extends AbstractPacketOutputStream {
         this.seqNo = seqNo;
         pos = 4;
         cmdLength = 0;
+        mark = -1;
+        markHeader = null;
+        sendCmd = 0;
     }
 
     @Override
@@ -93,6 +97,12 @@ public class StandardPacketOutputStream extends AbstractPacketOutputStream {
             buf[1] = (byte) ((pos - 4) >>> 8);
             buf[2] = (byte) ((pos - 4) >>> 16);
             buf[3] = (byte) this.seqNo++;
+            int savePos = pos;
+            if (mark != -1 && !commandEnd) {
+                //multiple command in a row.
+                // then can flush command until mark.
+                pos = mark;
+            }
             checkMaxAllowedLength(pos - 4);
             out.write(buf, 0, pos);
             if (logger.isTraceEnabled()) {
@@ -111,7 +121,22 @@ public class StandardPacketOutputStream extends AbstractPacketOutputStream {
             if (commandEnd && pos == MAX_PACKET_LENGTH) writeEmptyPacket();
 
             pos = 4;
+
+            if (mark != -1  && !commandEnd) {
+                System.arraycopy(markHeader, 0, buf, 4, markHeader.length);
+                pos = markHeader.length + 4;
+                System.arraycopy(buf, mark, buf, pos, (savePos - mark));
+                pos += (savePos - mark);
+                mark = -1;
+                this.seqNo = 0;
+                sendCmd += 1;
+            }
         }
+    }
+
+
+    public void markHeader() {
+        markHeader = Arrays.copyOfRange(buf, 4, pos);
     }
 
     /**

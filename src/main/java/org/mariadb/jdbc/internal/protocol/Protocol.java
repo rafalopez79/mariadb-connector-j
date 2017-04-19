@@ -164,6 +164,8 @@ public interface Protocol {
 
     void getResult(Results results) throws SQLException;
 
+    void getResult(Results results, boolean bulkResult) throws SQLException;
+
     void cancelCurrentQuery() throws SQLException, IOException;
 
     void skip() throws SQLException, SQLException;

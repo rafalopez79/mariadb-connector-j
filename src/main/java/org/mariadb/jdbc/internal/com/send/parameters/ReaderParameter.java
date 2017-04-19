@@ -84,10 +84,12 @@ public class ReaderParameter implements Cloneable, ParameterHolder {
      */
     public void writeTo(PacketOutputStream pos) throws IOException {
         pos.write(QUOTE);
-        if (length == Long.MAX_VALUE) {
-            pos.write(reader, true, noBackslashEscapes);
-        } else {
-            pos.write(reader, length, true, noBackslashEscapes);
+        if (reader != null) {
+            if (length == Long.MAX_VALUE) {
+                pos.write(reader, true, noBackslashEscapes);
+            } else {
+                pos.write(reader, length, true, noBackslashEscapes);
+            }
         }
         pos.write(QUOTE);
     }
@@ -109,10 +111,12 @@ public class ReaderParameter implements Cloneable, ParameterHolder {
      * @throws IOException if socket error occur
      */
     public void writeBinary(final PacketOutputStream pos) throws IOException {
-        if (length == Long.MAX_VALUE) {
-            pos.write(reader, false, noBackslashEscapes);
-        } else {
-            pos.write(reader, length, false, noBackslashEscapes);
+        if (reader != null) {
+            if (length == Long.MAX_VALUE) {
+                pos.write(reader, false, noBackslashEscapes);
+            } else {
+                pos.write(reader, length, false, noBackslashEscapes);
+            }
         }
     }
 
@@ -127,7 +131,7 @@ public class ReaderParameter implements Cloneable, ParameterHolder {
     }
 
     public boolean isNullData() {
-        return false;
+        return reader == null;
     }
 
     public boolean isLongData() {

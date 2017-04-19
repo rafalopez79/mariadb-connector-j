@@ -85,6 +85,10 @@ public class DateParameter implements Cloneable, ParameterHolder {
      * @param os output buffer
      */
     public void writeTo(final PacketOutputStream os) throws IOException {
+        if (date == null) {
+            os.write(NullParameter.NULL);
+            return;
+        }
         os.write(QUOTE);
         os.write(dateByteFormat());
         os.write(QUOTE);
@@ -129,11 +133,11 @@ public class DateParameter implements Cloneable, ParameterHolder {
 
     @Override
     public String toString() {
-        return "'" + date.toString() + "'";
+        return (date == null) ? "null" : "'" + date.toString() + "'";
     }
 
     public boolean isNullData() {
-        return false;
+        return date == null;
     }
 
     public boolean isLongData() {

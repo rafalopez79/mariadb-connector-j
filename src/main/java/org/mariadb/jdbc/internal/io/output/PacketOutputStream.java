@@ -107,4 +107,12 @@ public interface PacketOutputStream  {
     void permitTrace(boolean permitTrace);
 
     void setServerThreadId(long serverThreadId, Boolean isMaster);
+
+    void mark();
+
+    void markHeader();
+
+    int getSendCmd();
+
+    int getSendCmdDecrement();
 }

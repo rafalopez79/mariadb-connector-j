@@ -72,11 +72,15 @@ public class StringParameter implements Cloneable, ParameterHolder {
      * @param pos outpustream.
      */
     public void writeTo(final PacketOutputStream pos) throws IOException {
+        if (stringValue == null) {
+            pos.write(NullParameter.NULL);
+            return;
+        }
         pos.write(stringValue,true, noBackslashEscapes);
     }
 
     public long getApproximateTextProtocolLength() {
-        return stringValue.length() * 3;
+        return stringValue == null ? 4 : stringValue.length() * 3;
     }
 
     /**
@@ -98,6 +102,7 @@ public class StringParameter implements Cloneable, ParameterHolder {
 
     @Override
     public String toString() {
+        if (stringValue == null) return "null";
         if (stringValue.length() < 1024) {
             return "'" + stringValue + "'";
         } else {
@@ -106,7 +111,7 @@ public class StringParameter implements Cloneable, ParameterHolder {
     }
 
     public boolean isNullData() {
-        return false;
+        return stringValue == null;
     }
 
     public boolean isLongData() {

@@ -161,5 +161,11 @@ public class CmdInformationSingle implements CmdInformation {
     public void addSuccessStat(long updateCount, long insertId) {
         //cannot occur
     }
+
+    @Override
+    public void addBulkResult(SelectResultSet resultSet) {
+        //not possible
+    }
+
 }
 

@@ -60,84 +60,68 @@ import java.util.Iterator;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class CmdInformationBatch implements CmdInformation {
+public class CmdInformationBulk implements CmdInformation {
 
-    private Queue<Long> insertIds;
+    private Queue<RowResult> rowResults;
     private Queue<Long> updateCounts;
-    private int insertIdNumber = 0;
-    private int expectedSize;
-    private int autoIncrement;
     private boolean hasException;
 
+
     /**
-     * CmdInformationBatch is similar to CmdInformationMultiple, but knowing it's for batch,
-     * doesn't take take of moreResult.
-     * That permit to use ConcurrentLinkedQueue, and then when option "useBatchMultiSend" is set
-     * and batch is interrupted, will permit to reading thread to keep connection in a
-     * correct state without any ConcurrentModificationException.
+     * CmdInformationBulk store information result dedicated to bulk results
      *
-     *
-     * @param expectedSize  expected batch size.
-     * @param autoIncrement connection auto increment value.
+     * @param updateCount  update count
      */
-    public CmdInformationBatch(int expectedSize, int autoIncrement) {
-        this.expectedSize = expectedSize;
-        this.insertIds = new ConcurrentLinkedQueue<>();
-        this.updateCounts = new ConcurrentLinkedQueue<>();
-        this.autoIncrement = autoIncrement;
+    public CmdInformationBulk(long updateCount) {
+        rowResults = new ConcurrentLinkedQueue<>();
+        updateCounts = new ConcurrentLinkedQueue<>();
+        updateCounts.add(updateCount);
     }
 
     @Override
     public void addErrorStat() {
         hasException = true;
-        this.updateCounts.add((long) Statement.EXECUTE_FAILED);
     }
 
     public void addResultSetStat() {
-        this.updateCounts.add((long) RESULT_SET_VALUE);
+        //do nothing, bulk cannot have result-set other than insert ids.
     }
 
     @Override
     public void addSuccessStat(long updateCount, long insertId) {
-        this.insertIds.add(insertId);
-        insertIdNumber += updateCount;
-        this.updateCounts.add(updateCount);
+        updateCounts.add(updateCount);
+    }
+
+    @Override
+    public void addBulkResult(SelectResultSet resultSet) {
+        try {
+            while (resultSet.next()) {
+                rowResults.add(new RowResult(resultSet.getLong(1),
+                        resultSet.getLong(2),
+                        resultSet.getLong(3)));
+            }
+        } catch (SQLException sqle) {
+            //cannot occur
+        }
     }
 
     @Override
     public int[] getUpdateCounts() {
+        long size = 0;
+        for (long updateCount : updateCounts) size += updateCount;
+        int[] ret = new int[(int) size];
 
-        int[] ret = new int[Math.max(updateCounts.size(), expectedSize)];
-
-        Iterator<Long> iterator = updateCounts.iterator();
-        int pos = 0;
-        while (iterator.hasNext()) {
-            ret[pos++] = iterator.next().intValue();
-        }
-
-        //in case of Exception
-        while (pos < ret.length) {
-            ret[pos++] = Statement.EXECUTE_FAILED;
-        }
-
+        Arrays.fill(ret, hasException ? Statement.EXECUTE_FAILED : Statement.SUCCESS_NO_INFO);
         return ret;
     }
 
     @Override
     public long[] getLargeUpdateCounts() {
-        long[] ret = new long[Math.max(updateCounts.size(), expectedSize)];
+        long size = 0;
+        for (long updateCount : updateCounts) size += updateCount;
+        long[] ret = new long[(int) size];
 
-        Iterator<Long> iterator = updateCounts.iterator();
-        int pos = 0;
-        while (iterator.hasNext()) {
-            ret[pos++] = iterator.next();
-        }
-
-        //in case of Exception
-        while (pos < ret.length) {
-            ret[pos++] = Statement.EXECUTE_FAILED;
-        }
-
+        Arrays.fill(ret, hasException ? Statement.EXECUTE_FAILED : Statement.SUCCESS_NO_INFO);
         return ret;
     }
 
@@ -148,9 +132,8 @@ public class CmdInformationBatch implements CmdInformation {
      * @return update count array.
      */
     public int[] getRewriteUpdateCounts() {
-        int[] ret = new int[expectedSize];
-        Arrays.fill(ret, hasException ? Statement.EXECUTE_FAILED : Statement.SUCCESS_NO_INFO);
-        return ret;
+        //no rewrite
+        return null;
     }
 
     /**
@@ -158,40 +141,49 @@ public class CmdInformationBatch implements CmdInformation {
      * @return update count array.
      */
     public long[] getRewriteLargeUpdateCounts() {
-        long[] ret = new long[expectedSize];
-        Arrays.fill(ret, hasException ? Statement.EXECUTE_FAILED : Statement.SUCCESS_NO_INFO);
-        return ret;
+        //no rewrite
+        return null;
     }
 
     @Override
     public int getUpdateCount() {
-        Long updateCount = updateCounts.peek();
-        return (updateCount == null) ? - 1 : updateCount.intValue();
+        long updateCountTotal = 0;
+        boolean hasUpdate = false;
+        for (long updateCount : updateCounts) {
+            updateCountTotal += updateCount;
+            hasUpdate = true;
+        }
+        return (!hasUpdate) ? - 1 : (int) updateCountTotal;
     }
 
     @Override
     public long getLargeUpdateCount() {
-        Long updateCount = updateCounts.peek();
-        return (updateCount == null) ? - 1 : updateCount;
+        long updateCountTotal = 0;
+        boolean hasUpdate = false;
+        for (long updateCount : updateCounts) {
+            updateCountTotal += updateCount;
+            hasUpdate = true;
+        }
+        return (!hasUpdate) ? - 1 : updateCountTotal;
     }
 
     @Override
     public ResultSet getBatchGeneratedKeys(Protocol protocol) {
-        long[] ret = new long[insertIdNumber];
-        int position = 0;
-        long insertId;
-        Iterator<Long> idIterator = insertIds.iterator();
-        Iterator<Long> updateIterator = updateCounts.iterator();
-        while (updateIterator.hasNext()) {
-            int updateCount = updateIterator.next().intValue();
-            if (updateCount != Statement.EXECUTE_FAILED
-                    && updateCount != RESULT_SET_VALUE
-                    && (insertId = idIterator.next().longValue()) > 0) {
-                for (int i = 0; i < updateCount; i++) {
-                    ret[position++] = insertId + i * autoIncrement;
-                }
+        long size = 0;
+        for (RowResult rowResult : rowResults) {
+            size += rowResult.len;
+        }
+        long[] ret = new long[(int) size];
+
+        Iterator<RowResult> rowResultsIter = rowResults.iterator();
+        int pos = 0;
+        while (rowResultsIter.hasNext()) {
+            RowResult rowResult = rowResultsIter.next();
+            for (int i = 0; i < rowResult.len; i++) {
+                ret[pos++] = rowResult.id + (i * rowResult.autoincrement);
             }
         }
+
         return SelectResultSet.createGeneratedData(ret, protocol, true);
     }
 
@@ -203,23 +195,8 @@ public class CmdInformationBatch implements CmdInformation {
      * @return a resultSet with insert ids.
      */
     public ResultSet getGeneratedKeys(Protocol protocol) {
-        long[] ret = new long[insertIdNumber];
-        int position = 0;
-        long insertId;
-        Iterator<Long> idIterator = insertIds.iterator();
-        Iterator<Long> updateIterator = updateCounts.iterator();
-
-        while (updateIterator.hasNext()) {
-            int updateCount = updateIterator.next().intValue();
-            if (updateCount != Statement.EXECUTE_FAILED
-                    && updateCount != RESULT_SET_VALUE
-                    && (insertId = idIterator.next().longValue()) > 0) {
-                for (int i = 0; i < updateCount; i++) {
-                    ret[position++] = insertId + i * autoIncrement;
-                }
-            }
-        }
-        return SelectResultSet.createGeneratedData(ret, protocol, true);
+        //not called
+        return null;
     }
 
     public int getCurrentStatNumber() {
@@ -237,9 +214,16 @@ public class CmdInformationBatch implements CmdInformation {
         return false;
     }
 
-    @Override
-    public void addBulkResult(SelectResultSet resultSet) {
-        //not possible
+    private class RowResult {
+        public long id;
+        public long len;
+        public long autoincrement;
+
+        public RowResult(long id, long len, long autoincrement) {
+            this.id = id;
+            this.len = len;
+            this.autoincrement = autoincrement;
+        }
     }
 }
 

@@ -66,6 +66,7 @@ public class Results {
     private MariaDbStatement statement;
     private int fetchSize;
     private boolean batch;
+    private boolean bulk;
     private int expectedSize;
     private CmdInformation cmdInformation;
     private Deque<SelectResultSet> executionResults;
@@ -87,6 +88,7 @@ public class Results {
         this.fetchSize = 0;
         this.maxFieldSize = 0;
         this.batch = false;
+        this.bulk = false;
         this.expectedSize = 1;
         this.cmdInformation = null;
         this.binaryFormat = false;
@@ -104,6 +106,7 @@ public class Results {
         this.fetchSize = 0;
         this.maxFieldSize = 0;
         this.batch = false;
+        this.bulk = false;
         this.expectedSize = 1;
         this.cmdInformation = null;
         this.binaryFormat = false;
@@ -128,6 +131,7 @@ public class Results {
         this.statement = statement;
         this.fetchSize = fetchSize;
         this.batch = batch;
+        this.bulk = false;
         this.maxFieldSize = statement.getMaxFieldSize();
         this.expectedSize = expectedSize;
         this.cmdInformation = null;
@@ -149,6 +153,7 @@ public class Results {
     public void reset(int fetchSize, boolean batch, int expectedSize, boolean binaryFormat, int resultSetScrollType) {
         this.fetchSize = fetchSize;
         this.batch = batch;
+        this.bulk = false;
         this.maxFieldSize = statement.getMaxFieldSize();
         this.expectedSize = expectedSize;
         this.cmdInformation = null;
@@ -166,7 +171,11 @@ public class Results {
     public void addStats(long updateCount, long insertId, boolean moreResultAvailable) {
         if (cmdInformation == null) {
             if (batch) {
-                cmdInformation = new CmdInformationBatch(expectedSize, autoIncrement);
+                if (bulk) {
+                    cmdInformation = new CmdInformationBulk(expectedSize);
+                } else {
+                    cmdInformation = new CmdInformationBatch(expectedSize, autoIncrement);
+                }
             } else if (moreResultAvailable) {
                 cmdInformation = new CmdInformationMultiple(expectedSize, autoIncrement);
             } else {
@@ -197,6 +206,15 @@ public class Results {
 
     public int getCurrentStatNumber() {
         return (cmdInformation == null) ? 0 : cmdInformation.getCurrentStatNumber();
+    }
+
+    /**
+     * Add execution statistics.
+     *
+     * @param resultSet        bulk result-set
+     */
+    public void addBulkResultsetStats(SelectResultSet resultSet) {
+        cmdInformation.addBulkResult(resultSet);
     }
 
     /**
@@ -403,5 +421,9 @@ public class Results {
 
     public void setAutoIncrement(int autoIncrement) {
         this.autoIncrement = autoIncrement;
+    }
+
+    public void setBulk(boolean bulk) {
+        this.bulk = bulk;
     }
 }

@@ -793,7 +793,8 @@ public abstract class AbstractConnectProtocol implements Protocol {
                 | MariaDbServerCapabilities.CONNECT_ATTRS
                 | MariaDbServerCapabilities.PLUGIN_AUTH_LENENC_CLIENT_DATA
                 | MariaDbServerCapabilities.CLIENT_SESSION_TRACK
-                | MariaDbServerCapabilities.MARIADB_CLIENT_COM_IN_AUTH;
+                | MariaDbServerCapabilities.MARIADB_CLIENT_COM_IN_AUTH
+                | MariaDbServerCapabilities.MARIADB_CLIENT_STMT_BULK_OPERATIONS;
 
         if (options.allowMultiQueries || (options.rewriteBatchedStatements)) {
             capabilities |= MariaDbServerCapabilities.MULTI_STATEMENTS;

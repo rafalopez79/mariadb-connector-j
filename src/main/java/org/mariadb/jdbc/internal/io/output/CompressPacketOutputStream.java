@@ -92,6 +92,9 @@ public class CompressPacketOutputStream extends AbstractPacketOutputStream {
         this.seqNo = 0;
         pos = 0;
         cmdLength = 0;
+        mark = -1;
+        markHeader = null;
+        sendCmd = 0;
         remainingData = EMPTY_ARRAY;
         lastPacketExactMaxPacketLength = false;
     }
@@ -130,7 +133,15 @@ public class CompressPacketOutputStream extends AbstractPacketOutputStream {
      * @throws IOException id connection error occur.
      */
     protected void flushBuffer(boolean commandEnd) throws IOException {
+        int savePos = pos;
+        if (mark != -1 && !commandEnd) {
+            //multiple command in a row.
+            // then can flush command until mark.
+            pos = mark;
+        }
+
         if (pos > 0) {
+
             if (pos + remainingData.length > MIN_COMPRESSION_SIZE) {
 
                 byte[] compressedBytes;
@@ -186,6 +197,16 @@ public class CompressPacketOutputStream extends AbstractPacketOutputStream {
                     lastPacketExactMaxPacketLength = pos == MAX_PACKET_LENGTH;
                     if (commandEnd && lastPacketExactMaxPacketLength) writeEmptyPacket();
                     pos = 0;
+
+                    if (mark != -1  && !commandEnd) {
+                        System.arraycopy(markHeader, 0, buf, 0, markHeader.length);
+                        pos = markHeader.length;
+                        System.arraycopy(buf, mark, buf, pos, (savePos - mark));
+                        pos += (savePos - mark);
+                        mark = -1;
+                        this.seqNo = 0;
+                        sendCmd += 1;
+                    }
                     return;
                 }
             }
@@ -235,6 +256,16 @@ public class CompressPacketOutputStream extends AbstractPacketOutputStream {
             //if last packet fill the max size, must send an empty packet to indicate command end.
             lastPacketExactMaxPacketLength = pos == MAX_PACKET_LENGTH;
             pos = 0;
+
+            if (mark != -1  && !commandEnd) {
+                System.arraycopy(markHeader, 0, buf, 0, markHeader.length);
+                pos = markHeader.length;
+                System.arraycopy(buf, mark, buf, pos, (savePos - mark));
+                pos += (savePos - mark);
+                mark = -1;
+                this.seqNo = 0;
+                sendCmd += 1;
+            }
         }
 
         if (remainingData.length > 0) {
@@ -316,6 +347,8 @@ public class CompressPacketOutputStream extends AbstractPacketOutputStream {
             }
             if (commandEnd && lastPacketExactMaxPacketLength) writeEmptyPacket();
         }
+        return;
+
     }
 
     /**
@@ -347,6 +380,10 @@ public class CompressPacketOutputStream extends AbstractPacketOutputStream {
                         + " packet:<hidden>");
             }
         }
+    }
+
+    public void markHeader() {
+        markHeader = Arrays.copyOfRange(buf, 0, pos);
     }
 
 }

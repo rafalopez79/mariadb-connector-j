@@ -55,6 +55,8 @@ import org.mariadb.jdbc.MariaDbStatement;
 import org.mariadb.jdbc.UrlParser;
 import org.mariadb.jdbc.internal.ColumnType;
 
+import org.mariadb.jdbc.internal.MariaDbServerCapabilities;
+import org.mariadb.jdbc.internal.com.Packet;
 import org.mariadb.jdbc.internal.com.read.ErrorPacket;
 import org.mariadb.jdbc.internal.com.read.resultset.SelectResultSet;
 import org.mariadb.jdbc.internal.com.send.*;
@@ -84,6 +86,7 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.sql.*;
+import java.util.Iterator;
 import java.util.List;
 import java.util.ServiceLoader;
 import java.util.concurrent.ExecutionException;
@@ -519,6 +522,99 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
             throws SQLException {
 
         cmdPrologue();
+
+        if ((serverCapabilities & MariaDbServerCapabilities.MARIADB_CLIENT_STMT_BULK_OPERATIONS) != 0) {
+            try {
+                int statementId = -1;
+                int parameterCount = -1;
+                ComStmtPrepare comStmtPrepare = null;
+                results.setBulk(true);
+
+                //add prepare sub-command
+                if (serverPrepareResult == null) {
+                    if (getOptions().cachePrepStmts) {
+
+                        String key = new StringBuilder(getDatabase()).append("-").append(sql).toString();
+                        serverPrepareResult = prepareStatementCache().get(key);
+                        if (serverPrepareResult != null && !serverPrepareResult.incrementShareCounter()) {
+                            //in cache but been de-allocated
+                            serverPrepareResult = null;
+                        }
+                        statementId = (serverPrepareResult == null) ? -1 : serverPrepareResult.getStatementId();
+
+                    }
+                    if (statementId == -1) {
+                        comStmtPrepare = new ComStmtPrepare(this, sql);
+                        comStmtPrepare.send(writer);
+                    }
+                } else {
+                    statementId = serverPrepareResult.getStatementId();
+                    parameterCount = serverPrepareResult.getParameters().length;
+                }
+
+                if (statementId == -1) {
+                    //read prepare result
+                    comStmtPrepare.read(reader, eofDeprecated);
+                }
+
+                while (true) {
+                    writer.startPacket(0);
+                    writer.write(Packet.COM_STMT_BULK_EXECUTE);
+                    writer.writeInt(statementId);
+                    writer.writeShort((short) 192); //Return generated auto-increment IDs + Send types to server
+
+                    Iterator<ParameterHolder[]> it = parametersList.iterator();
+                    ParameterHolder[] holders = it.next();
+                    ColumnType[] parameterTypeHeader = new ColumnType[holders.length];
+
+                    //validate parameter set
+                    if (parameterCount != -1 && parameterCount < holders.length) {
+                        throw new SQLException("Parameter at position " + (parameterCount - 1) + " is not set", "07004");
+                    }
+
+                    //send type
+                    for (int i = 0; i < parameterCount; i++) {
+                        parameterTypeHeader[i] = holders[i].getColumnType();
+                        writer.writeShort((short) parameterTypeHeader[i].getType());
+                    }
+                    writer.markHeader();
+
+                    while (true) {
+                        //check that data types haven't changed
+                        for (int i = 0; i < parameterCount; i++) {
+                            if (parameterTypeHeader[i] != holders[i].getColumnType()) break;
+                        }
+
+                        for (int i = 0; i < parameterCount; i++) {
+                            ParameterHolder holder = holders[i];
+                            if (holder.isNullData()) {
+                                writer.write((byte) 1);
+                            } else {
+                                writer.write((byte) 0);
+                                holder.writeBinary(writer);
+                            }
+                        }
+
+                        if (writer.getSendCmdDecrement() > 0) getResult(results, true);
+
+                        if (!it.hasNext()) break;
+                        holders = it.next();
+
+                        //mark permit to indicate that command can be send has is
+                        writer.mark();
+                    }
+
+                    writer.flush();
+                    getResult(results, true);
+                    break;
+                }
+
+                return serverPrepareResult;
+
+            } catch (IOException e) {
+                throw handleIoException(e);
+            }
+        }
 
         return (ServerPrepareResult) new AbstractMultiSend(this, writer, results, serverPrepareResult, parametersList,true, sql) {
             @Override
@@ -986,11 +1082,24 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
     @Override
     public void getResult(Results results) throws SQLException {
 
-        readPacket(results);
+        readPacket(results, false);
 
         //load additional results
         while (moreResults) {
-            readPacket(results);
+            readPacket(results, false);
+        }
+
+    }
+
+
+    @Override
+    public void getResult(Results results, boolean bulkResult) throws SQLException {
+
+        readPacket(results, bulkResult);
+
+        //load additional results
+        while (moreResults) {
+            readPacket(results, bulkResult);
         }
 
     }
@@ -1000,10 +1109,11 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
      *
      * @see <a href="https://mariadb.com/kb/en/mariadb/4-server-response-packets/">server response packets</a>
      *
-     * @param results result object
+     * @param results       result object
+     * @param bulkResult    result-set are bulk results
      * @throws SQLException if sub-result connection fail
      */
-    public void readPacket(Results results) throws SQLException {
+    public void readPacket(Results results, boolean bulkResult) throws SQLException {
         Buffer buffer;
         try {
             buffer = reader.getPacket(true);
@@ -1037,7 +1147,7 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
             //* ResultSet
             //*********************************************************************************************************
             default:
-                readResultSet(buffer, results);
+                readResultSet(buffer, results, bulkResult);
                 break;
 
         }
@@ -1244,11 +1354,12 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
      *
      * @see <a href="https://mariadb.com/kb/en/mariadb/resultset/">resultSet packets</a>
      *
-     * @param buffer current buffer
-     * @param results result object
+     * @param buffer        current buffer
+     * @param results       result object
+     * @param bulkResult    bulk insert ids result-set
      * @throws SQLException if sub-result connection fail
      */
-    public void readResultSet(Buffer buffer, Results results) throws SQLException {
+    public void readResultSet(Buffer buffer, Results results, boolean bulkResult) throws SQLException {
         this.hasWarnings = false;
         this.moreResults = false;
         long fieldCount = buffer.getLengthEncodedNumeric();
@@ -1279,7 +1390,12 @@ public class AbstractQueryProtocol extends AbstractConnectProtocol implements Pr
 
             //read resultSet
             SelectResultSet selectResultSet = new SelectResultSet(ci, results, this, reader, callableResult, eofDeprecated);
-            results.addResultSet(selectResultSet, moreResults);
+
+            if (bulkResult) {
+                results.addBulkResultsetStats(selectResultSet);
+            } else {
+                results.addResultSet(selectResultSet, moreResults);
+            }
 
         } catch (IOException e) {
             throw handleIoException(e);
