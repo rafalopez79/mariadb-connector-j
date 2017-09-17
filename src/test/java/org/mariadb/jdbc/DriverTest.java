@@ -201,13 +201,12 @@ public class DriverTest extends BaseTest {
 
         //statement that cannot be prepared
         try (PreparedStatement pstmt = sharedConnection.prepareStatement(
-                "select  TMP.field1 from (select ? from dual) TMP")) {
-            ParameterMetaData parameterMetaData = pstmt.getParameterMetaData();
+                "select  TMP.field1 from (select ? from dual) TMP")) {           
             try {
-                parameterMetaData.getParameterCount();
+            	ParameterMetaData parameterMetaData = pstmt.getParameterMetaData();
                 fail();
-            } catch (SQLException sqle) {
-                assertEquals("S1C00", sqle.getSQLState());
+            } catch (SQLException sqle) {            	 
+                assertEquals("42S22", sqle.getSQLState());
             }
         }
         Map<String, Integer> endingValues = loadVariables(stmt);

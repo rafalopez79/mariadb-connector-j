@@ -455,16 +455,20 @@ public class MariaDbPreparedStatementClient extends BasePrepareStatement {
         return parameterMetaData;
     }
 
-    private void setParametersData() {
-        try (MariaDbPreparedStatementServer ssps = new MariaDbPreparedStatementServer(connection, this.sqlQuery,
-                ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY, Statement.NO_GENERATED_KEYS)) {
-            resultSetMetaData = ssps.getMetaData();
-            parameterMetaData = ssps.getParameterMetaData();
-        } catch (SQLException sqle) {
-            //if statement cannot be prepared
-            parameterMetaData = new MariaDbParameterMetaData(null);
-        }
-    }
+    private void setParametersData() throws SQLSyntaxErrorException {
+	try (MariaDbPreparedStatementServer ssps = new MariaDbPreparedStatementServer(connection, this.sqlQuery,
+			ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY, Statement.NO_GENERATED_KEYS)) {
+		resultSetMetaData = ssps.getMetaData();
+		parameterMetaData = ssps.getParameterMetaData();
+	} catch (SQLSyntaxErrorException sqlsse) {
+		// syntax error thrown
+		throw sqlsse;
+	} catch (SQLException sqle) {
+		//if statement cannot be prepared
+		parameterMetaData = new MariaDbParameterMetaData(null);
+	}
+}
+
 
 
     /**
